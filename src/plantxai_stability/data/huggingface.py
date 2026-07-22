@@ -149,11 +149,11 @@ def iter_manifest_rows(
     class_ids = {name: index for index, name in enumerate(selected)}
     for split_name, split in dataset.items():
         for source_row_index, row in enumerate(split):
-            image = row[schema.image_column]
-            digest, width, height = canonical_rgb_sha256_image(image)
             class_name = _label_name(row[schema.label_column], schema.label_names)
             if class_name not in class_filter:
                 continue
+            image = row[schema.image_column]
+            digest, width, height = canonical_rgb_sha256_image(image)
             leaf_id = row.get(schema.leaf_id_column)
             if leaf_id in (None, ""):
                 raise ValueError("PlantVillage row has an empty leaf_id; refusing unsafe splits")
