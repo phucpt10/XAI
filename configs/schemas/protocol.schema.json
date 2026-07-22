@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.org/plantxai-stability/protocol.schema.json",
-  "title": "PlantXAI-Stability protocol draft",
+  "title": "PlantXAI-Stability protocol",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "protocol_version", "status", "frozen", "seed", "governance", "dataset", "models", "training", "transformations", "xai", "statistics"],
@@ -28,10 +28,11 @@
         "evidence_records": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["runtime_readiness", "xai_target_layers"],
+          "required": ["runtime_readiness", "xai_target_layers", "transformation_severity"],
           "properties": {
             "runtime_readiness": {"type": "string", "minLength": 1},
-            "xai_target_layers": {"type": "string", "minLength": 1}
+            "xai_target_layers": {"type": "string", "minLength": 1},
+            "transformation_severity": {"type": "string", "minLength": 1}
           }
         },
         "official_experiment_allowed": {"type": "boolean"},

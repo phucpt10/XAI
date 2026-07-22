@@ -2,11 +2,11 @@
 
 PlantXAI-Stability is research software for evaluating prediction robustness and XAI explanation stability under controlled image transformations.
 
-The implementation follows the English specification in `PlantXAI-Stability_Research_Software_Specification_En.docx` and keeps the protocol in a fail-closed draft state until the dataset audit, leaf identity, frozen splits, severity pilot, checkpoint selection and target-layer validation are approved.
+The implementation follows the English specification in `PlantXAI-Stability_Research_Software_Specification_En.docx`. G0B is frozen after the approved dataset, runtime, target-layer and severity evidence; checkpoint selection and official test evaluation remain independently fail-closed.
 
 ## Current implementation
 
-- Versioned protocol draft at `configs/protocol/v0.9/protocol.yaml`.
+- Versioned G0B-frozen protocol at `configs/protocol/v0.9/protocol.yaml`.
 - JSON schema and fail-closed protocol loader.
 - Immutable data contracts for samples, predictions, transformations and joint records.
 - Canonical RGB hashing and deterministic `sample_id` construction.
@@ -53,7 +53,9 @@ python -m plantxai_stability.cli validate-protocol configs/protocol/v0.9/protoco
 python -m plantxai_stability.cli smoke configs/protocol/v0.9/protocol.yaml
 ```
 
-The official `run` command intentionally refuses to execute while the protocol is draft or G0B is blocked. This prevents accidental scientific claims before the required evidence exists.
+Official training additionally requires a frozen dataset record whose protocol
+hash exactly matches the G0B-frozen protocol. Official test evaluation remains
+blocked until validation-selected checkpoints receive G1/G2 approval.
 
 ## Official-run prerequisites
 

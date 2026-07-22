@@ -76,8 +76,18 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         raise ValueError("governance.evidence_records.runtime_readiness is required")
     if not evidence_records.get("xai_target_layers"):
         raise ValueError("governance.evidence_records.xai_target_layers is required")
+    if not evidence_records.get("transformation_severity"):
+        raise ValueError("governance.evidence_records.transformation_severity is required")
+    if values["frozen"] != (values["status"] == "frozen"):
+        raise ValueError("status=frozen and frozen=true must be declared together")
+    if values["frozen"] and not values.get("frozen_at"):
+        raise ValueError("A frozen protocol requires frozen_at")
     if values["frozen"] and governance.get("G0B_PROTOCOL_FREEZE_READY") != "pass":
         raise ValueError("A frozen protocol requires a passing G0B gate")
+    if governance.get("G0B_PROTOCOL_FREEZE_READY") == "pass" and governance.get(
+        "blockers"
+    ):
+        raise ValueError("A passing G0B gate cannot retain G0B blockers")
     if governance.get("official_training_allowed") and (
         not values["frozen"] or governance.get("G0B_PROTOCOL_FREEZE_READY") != "pass"
     ):

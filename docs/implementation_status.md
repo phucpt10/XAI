@@ -4,7 +4,7 @@ Date: 2026-07-23
 
 ## Implemented
 
-- Protocol v0.9 draft and fail-closed validation.
+- Protocol v0.9 frozen at G0B with fail-closed G1/G2 validation.
 - Stable sample identity and canonical RGB hashing.
 - Hugging Face adapter for `mohanty/PlantVillage` (`color`) with schema
   inspection, explicit `leaf_id` checks and optional manifest materialisation.
@@ -46,7 +46,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (41 tests; torch integration skipped when unavailable)
+pytest                          PASS (43 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -55,16 +55,18 @@ constant heatmap gate          PASS
 
 ## Official experiment status
 
-The official runner is intentionally blocked. The protocol currently has:
+Official test evaluation is intentionally blocked. Official training is
+authorized only with a freeze record matching the final G0B hash. The protocol
+currently has:
 
 ```text
-status: draft
-frozen: false
+status: frozen
+frozen: true
 G0A_BOOTSTRAP_READY: PASS
-G0B_PROTOCOL_FREEZE_READY: BLOCKED
+G0B_PROTOCOL_FREEZE_READY: PASS
 G1_CHECKPOINT_SELECTION: BLOCKED
 G2_TEST_EVALUATION_READY: BLOCKED
-official_training_allowed: false
+official_training_allowed: true
 official_test_evaluation_allowed: false
 official_experiment_allowed: false
 ```
@@ -81,10 +83,16 @@ target-layer/CAM checks pass. `DR-RUNTIME-001` and `DR-XAI-001` bind the
 reported evidence hashes. No model accuracy, confidence interval, p-value or
 official XAI stability result has been produced.
 
-The remaining work is staged to avoid circular governance:
+`DR-SEVERITY-006` binds the approved v6 pilot and four visual-review artifacts.
+Its outcome is `PASS_WITH_DECLARED_OPERATOR_LIMITATION`: severity is ordinal
+only within each transformation; rotation prediction claims are specific to
+the zero-filled operator; CAM stability requires forward alignment and M_T.
+The old frozen dataset record cannot authorize training because its protocol
+hash differs from the final G0B hash.
 
-1. G0B: visually approve transformation severity, freeze the protocol and
-   regenerate the frozen data bundle against that final pre-training hash.
+The remaining work is staged as follows:
+
+1. Recreate the frozen data bundle against the final G0B protocol hash.
 2. G1: train both backbones and select/hash checkpoints using validation only.
 3. G2: approve both checkpoint records and only then unlock official test.
 
@@ -101,5 +109,5 @@ technical checks but produced severity-correlated radial smearing.
 `DR-SEVERITY-005` replaces it with
 `shared_randomization_zero_fill_valid_mask_v6`. Rotation prediction results are
 operator-specific; explanation stability uses forward alignment and geometric
-M_T with masked Pearson/SSIM and top-k IoU. Evidence must be regenerated in new
-v6 directories.
+M_T with masked Pearson/SSIM and top-k IoU. The v6 technical and visual evidence
+passed and is approved by `DR-SEVERITY-006`.

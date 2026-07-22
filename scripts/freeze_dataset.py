@@ -28,6 +28,8 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--validation-fraction", type=float, default=0.2)
     args = parser.parse_args()
+    if args.output_dir.exists():
+        raise SystemExit("Freeze output already exists; use a new versioned directory")
     resolved = load_protocol(args.protocol)
     decision_record = yaml.safe_load(args.class_selection_dr.read_text(encoding="utf-8"))
     if decision_record.get("status") != "approved":
@@ -85,6 +87,7 @@ def main() -> int:
     if tuple(decision_record.get("selected_classes", [])) != expected_classes:
         raise SystemExit("Decision Record classes do not match the frozen protocol")
     audit_rows, audit = audit_manifest_records(records)
+    args.output_dir.mkdir(parents=True, exist_ok=False)
     audit_path = args.output_dir / "image_audit.parquet"
     if audit_path.exists():
         raise SystemExit("Freeze blocked: output directory already contains image_audit.parquet")

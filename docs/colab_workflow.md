@@ -12,16 +12,16 @@ while Colab provides the dataset cache, GPU and run output directory.
 !python -m pip install -e ".[hf,ml,xai,dev]"
 ```
 
-## 2. Validate the draft protocol
+## 2. Validate the governed protocol
 
 ```python
 !python -m plantxai_stability.cli validate-protocol configs/protocol/v0.9/protocol.yaml
 !python -m plantxai_stability.cli smoke configs/protocol/v0.9/protocol.yaml
 ```
 
-The official runner must remain blocked until G0B is approved. Use a separate
-non-official draft training run only for pipeline debugging, and label its
-outputs as `draft_smoke`.
+G0B is now approved, but official training still requires a newly generated
+freeze record with the same final protocol hash. Until that rebind exists, use
+only non-official draft smoke runs for pipeline debugging.
 
 ## 3. Inspect the Hugging Face source and audit leaf identity
 
@@ -224,6 +224,53 @@ verifies the pilot artifact hashes before producing four contact sheets:
   --output-dir /content/plantxai-severity-review-v6
 ```
 
+The project owner approved these artifacts through `DR-SEVERITY-006` with
+`PASS_WITH_DECLARED_OPERATOR_LIMITATION`. Pull that Decision Record and verify
+the final G0B protocol identity:
+
+```python
+%cd /content/PlantXAI-Stability
+!git pull origin main
+!python -m plantxai_stability.cli validate-protocol \
+  configs/protocol/v0.9/protocol.yaml
+```
+
+The expected final G0B protocol hash is
+`7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b`.
+The existing `/content/plantxai-frozen-v1` record has the earlier draft hash
+and cannot authorize official training. Recreate only the immutable freeze
+artifacts; do not redownload, rematerialize or resplit the dataset manually:
+
+```python
+!python scripts/freeze_dataset.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-manifest-v3/manifest.csv \
+  --class-selection-dr configs/protocol/v0.9/decision_records/DR-CLASS-001.yaml \
+  --quarantine-dr configs/protocol/v0.9/decision_records/DR-DUP-001.yaml \
+  --quarantine-registry /content/plantxai-manifest-v3/quarantine_registry.parquet \
+  --quarantine-summary /content/plantxai-manifest-v3/quarantine_summary.json \
+  --audit-identity /content/plantxai-tomato-inspection-v1/dataset_receipt.json \
+  --output-dir /content/plantxai-frozen-final-v1
+```
+
+Verify the new cryptographic binding before training:
+
+```python
+import json
+from pathlib import Path
+from plantxai_stability.config import load_protocol
+
+protocol = load_protocol("configs/protocol/v0.9/protocol.yaml")
+freeze = json.loads(
+    Path("/content/plantxai-frozen-final-v1/freeze_record.json").read_text()
+)
+assert freeze["protocol_hash"] == protocol.sha256
+assert freeze["protocol_hash"] == (
+    "7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b"
+)
+print("Final G0B freeze binding: PASS")
+```
+
 ## 6. Train and preserve checkpoints
 
 The training API in `plantxai_stability.training` selects checkpoints only by
@@ -239,7 +286,7 @@ from google.colab import drive
 drive.mount("/content/drive")
 ```
 
-After G0B passes, train ResNet50 in a new directory:
+After the final G0B freeze binding passes, train ResNet50 in a new directory:
 
 ```python
 !python scripts/train_colab.py \
