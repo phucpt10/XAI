@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,6 +30,9 @@ def main() -> int:
     parser.add_argument("--revision", help="Immutable HF commit SHA; required for official runs")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
+        "--cache-dir", type=Path, default=Path("/content/plantxai-hf-cache")
+    )
+    parser.add_argument(
         "--classes", nargs="*", help="Optional class subset; defaults to all classes"
     )
     parser.add_argument(
@@ -41,17 +45,51 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    dataset = load_hf_dataset(args.dataset_id, args.configuration, args.revision)
+    decision_record = None
+    if args.manifest:
+        if not args.classes:
+            raise SystemExit("Official manifest requires an explicit --classes list")
+        try:
+            import yaml
+        except ImportError as exc:
+            raise SystemExit(
+                "PyYAML is required to validate the class-selection Decision Record"
+            ) from exc
+        try:
+            decision_record = yaml.safe_load(
+                args.class_selection_dr.read_text(encoding="utf-8")
+            )
+        except (FileNotFoundError, yaml.YAMLError) as exc:
+            raise SystemExit(f"Cannot load class-selection Decision Record: {exc}") from exc
+        if decision_record.get("status") != "approved":
+            raise SystemExit(
+                "Official manifest blocked: class-selection Decision Record is not approved"
+            )
+        if tuple(args.classes) != tuple(decision_record.get("selected_classes", [])):
+            raise SystemExit("Requested classes do not match the approved Decision Record")
+
+    dataset = load_hf_dataset(
+        args.dataset_id,
+        args.configuration,
+        args.revision,
+        selected_classes=args.classes if args.manifest else None,
+        prepare_images=args.manifest,
+        cache_dir=args.cache_dir,
+        token=os.getenv("HF_TOKEN"),
+    )
+    resolved_revision = getattr(dataset, "resolved_revision", args.revision)
     schema = inspect_hf_schema(
         dataset,
         dataset_id=args.dataset_id,
         configuration=args.configuration,
-        revision=args.revision,
+        revision=resolved_revision,
     )
     report: dict[str, object] = {
         "dataset_id": schema.dataset_id,
         "configuration": schema.configuration,
         "revision": schema.revision,
+        "requested_revision": args.revision,
+        "resolved_revision": schema.revision,
         "splits": list(schema.splits),
         "split_counts": split_counts(dataset),
         "features": list(schema.features),
@@ -71,37 +109,20 @@ def main() -> int:
         "repository": args.dataset_id,
         "dataset_configuration": args.configuration,
         "requested_revision": args.revision,
-        "resolved_revision": args.revision,
+        "resolved_revision": resolved_revision,
         "dataset_fingerprints": fingerprints,
         "feature_schema": list(schema.features),
         "source_split_names": list(schema.splits),
         "sample_count": sum(counts.values()),
         "source_split_counts": counts,
-        "cache_or_storage_location": str(args.output_dir),
+        "cache_or_storage_location": getattr(dataset, "cache_location", str(args.cache_dir)),
+        "source_file_sha256": getattr(dataset, "source_file_sha256", {}),
         "retrieval_timestamp_utc": datetime.now(timezone.utc).isoformat(),
     }
     (args.output_dir / "dataset_receipt.json").write_text(
         json.dumps(receipt, indent=2, sort_keys=True), encoding="utf-8"
     )
     if args.manifest:
-        try:
-            import yaml
-        except ImportError as exc:
-            raise SystemExit("PyYAML is required to validate the class-selection Decision Record") from exc
-        try:
-            decision_record = yaml.safe_load(
-                args.class_selection_dr.read_text(encoding="utf-8")
-            )
-        except (FileNotFoundError, yaml.YAMLError) as exc:
-            raise SystemExit(f"Cannot load class-selection Decision Record: {exc}") from exc
-        if decision_record.get("status") != "approved":
-            raise SystemExit(
-                "Official manifest blocked: class-selection Decision Record is not approved"
-            )
-        approved_classes = tuple(decision_record.get("selected_classes", []))
-        requested_classes = tuple(args.classes or schema.label_names)
-        if requested_classes != approved_classes:
-            raise SystemExit("Requested classes do not match the approved Decision Record")
         records = build_hf_manifest(
             dataset,
             schema,

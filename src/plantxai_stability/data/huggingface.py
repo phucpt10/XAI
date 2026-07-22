@@ -13,6 +13,7 @@ from typing import Any, Iterable
 
 from plantxai_stability.contracts import SampleRecord
 from plantxai_stability.data.manifest import build_manifest, canonical_rgb_sha256_image
+from plantxai_stability.data.plantvillage_source import load_pinned_plantvillage
 
 
 @dataclass(frozen=True)
@@ -50,8 +51,25 @@ def load_hf_dataset(
     dataset_id: str = "mohanty/PlantVillage",
     configuration: str = "color",
     revision: str | None = None,
+    *,
+    selected_classes: Iterable[str] | None = None,
+    prepare_images: bool = False,
+    cache_dir: str | Path | None = None,
+    token: str | None = None,
 ) -> Any:
     """Load a pinned (or explicitly exploratory) Hugging Face dataset."""
+    if dataset_id == "mohanty/PlantVillage":
+        if revision is None:
+            raise ValueError("mohanty/PlantVillage requires a pinned revision")
+        return load_pinned_plantvillage(
+            dataset_id=dataset_id,
+            configuration=configuration,
+            revision=revision,
+            selected_classes=selected_classes,
+            prepare_images=prepare_images,
+            cache_dir=cache_dir,
+            token=token,
+        )
     try:
         from datasets import load_dataset
     except ImportError as exc:  # pragma: no cover - optional dependency
@@ -148,7 +166,8 @@ def iter_manifest_rows(
     # tomato protocol.
     class_ids = {name: index for index, name in enumerate(selected)}
     for split_name, split in dataset.items():
-        for source_row_index, row in enumerate(split):
+        for fallback_row_index, row in enumerate(split):
+            source_row_index = int(row.get("_source_row_index", fallback_row_index))
             class_name = _label_name(row[schema.label_column], schema.label_names)
             if class_name not in class_filter:
                 continue
