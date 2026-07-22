@@ -31,6 +31,8 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Validation-only, leaf-balanced image-space severity pilot with immutable
   per-sample metrics and an explicit human-approval gate.
 - Optional PyTorch model wrappers for ResNet50 and EfficientNet-B0.
+- Epoch-resumable Colab training with atomic latest/best checkpoints, complete
+  optimizer/RNG state and protocol/manifest lineage enforcement.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.
@@ -55,8 +57,8 @@ The official `run` command intentionally refuses to execute while the protocol i
 2. Build and approve the canonical manifest.
 3. Freeze leaf-safe train/validation/test splits.
 4. Pilot and approve transformation severities.
-5. Select and hash validation-approved model checkpoints.
-6. Runtime-validate target layers and CAM adapters.
-7. Freeze protocol and set G0B to PASS through a reviewed governance change.
+5. Freeze the pre-training protocol and rebind the frozen dataset record (G0B).
+6. Select and hash validation-approved model checkpoints (G1).
+7. Approve checkpoints and explicitly unlock official test evaluation (G2).
 
 No dataset count, accuracy, confidence interval, p-value or stability result is fabricated by this repository.

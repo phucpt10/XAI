@@ -35,7 +35,8 @@ Date: 2026-07-22
   recorded by `DR-XAI-001` without accessing official test.
 - Passing deterministic DataLoader and two-backbone mixed-precision smoke
   evidence recorded by `DR-RUNTIME-001`.
-- Colab-ready training, baseline evaluation and single-model joint evaluation scripts.
+- Colab-ready resumable training with epoch-boundary state, validation-selected
+  best checkpoints, lineage validation and test-gated evaluation scripts.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
@@ -45,7 +46,7 @@ Date: 2026-07-22
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (26 tests)
+pytest                          PASS (35 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -61,6 +62,10 @@ status: draft
 frozen: false
 G0A_BOOTSTRAP_READY: PASS
 G0B_PROTOCOL_FREEZE_READY: BLOCKED
+G1_CHECKPOINT_SELECTION: BLOCKED
+G2_TEST_EVALUATION_READY: BLOCKED
+official_training_allowed: false
+official_test_evaluation_allowed: false
 official_experiment_allowed: false
 ```
 
@@ -76,12 +81,12 @@ target-layer/CAM checks pass. `DR-RUNTIME-001` and `DR-XAI-001` bind the
 reported evidence hashes. No model accuracy, confidence interval, p-value or
 official XAI stability result has been produced.
 
-Only two protocol blockers remain:
+The remaining work is staged to avoid circular governance:
 
-1. Pilot and approve transformation severity without using official test.
-2. Train/select and hash validation-approved checkpoints.
-3. Regenerate the final frozen artifact bundle against the final protocol hash.
-4. Freeze the protocol through a reviewed governance change.
+1. G0B: visually approve transformation severity, freeze the protocol and
+   regenerate the frozen data bundle against that final pre-training hash.
+2. G1: train both backbones and select/hash checkpoints using validation only.
+3. G2: approve both checkpoint records and only then unlock official test.
 
 Severity pilot v1 passed its original numerical gate but failed human visual
 review because brightness and rotation direction, and the Gaussian base-noise

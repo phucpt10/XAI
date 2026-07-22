@@ -16,11 +16,15 @@
     "governance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["G0A_BOOTSTRAP_READY", "G0B_PROTOCOL_FREEZE_READY", "blockers", "evidence_records", "official_experiment_allowed"],
+      "required": ["G0A_BOOTSTRAP_READY", "G0B_PROTOCOL_FREEZE_READY", "blockers", "G1_CHECKPOINT_SELECTION", "checkpoint_blockers", "G2_TEST_EVALUATION_READY", "test_evaluation_blockers", "evidence_records", "official_experiment_allowed", "official_training_allowed", "official_test_evaluation_allowed"],
       "properties": {
         "G0A_BOOTSTRAP_READY": {"enum": ["pass", "blocked"]},
         "G0B_PROTOCOL_FREEZE_READY": {"enum": ["pass", "blocked"]},
         "blockers": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "G1_CHECKPOINT_SELECTION": {"enum": ["pass", "blocked"]},
+        "checkpoint_blockers": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "G2_TEST_EVALUATION_READY": {"enum": ["pass", "blocked"]},
+        "test_evaluation_blockers": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "evidence_records": {
           "type": "object",
           "additionalProperties": false,
@@ -30,7 +34,9 @@
             "xai_target_layers": {"type": "string", "minLength": 1}
           }
         },
-        "official_experiment_allowed": {"type": "boolean"}
+        "official_experiment_allowed": {"type": "boolean"},
+        "official_training_allowed": {"type": "boolean"},
+        "official_test_evaluation_allowed": {"type": "boolean"}
       }
     },
     "dataset": {
@@ -66,9 +72,21 @@
     "training": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pretrained", "max_epochs", "batch_size", "learning_rate", "optimizer", "weight_decay", "scheduler", "early_stopping_patience", "selection_metric", "mixed_precision"],
+      "required": ["pretrained", "pretrained_weights", "fine_tuning", "loss", "class_weighting", "max_epochs", "batch_size", "learning_rate", "optimizer", "weight_decay", "scheduler", "early_stopping_patience", "selection_metric", "mixed_precision", "deterministic_algorithms"],
       "properties": {
         "pretrained": {"type": "boolean"},
+        "pretrained_weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resnet50", "efficientnet_b0"],
+          "properties": {
+            "resnet50": {"const": "IMAGENET1K_V2"},
+            "efficientnet_b0": {"const": "IMAGENET1K_V1"}
+          }
+        },
+        "fine_tuning": {"const": "full_model"},
+        "loss": {"const": "cross_entropy"},
+        "class_weighting": {"const": "none"},
         "max_epochs": {"type": "integer", "minimum": 1},
         "batch_size": {"type": "integer", "minimum": 1},
         "learning_rate": {"type": "number", "exclusiveMinimum": 0},
@@ -77,7 +95,8 @@
         "scheduler": {"type": "string"},
         "early_stopping_patience": {"type": "integer", "minimum": 1},
         "selection_metric": {"type": "string"},
-        "mixed_precision": {"type": "boolean"}
+        "mixed_precision": {"type": "boolean"},
+        "deterministic_algorithms": {"const": true}
       }
     },
     "transformations": {

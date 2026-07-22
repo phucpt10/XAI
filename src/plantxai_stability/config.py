@@ -78,6 +78,16 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         raise ValueError("governance.evidence_records.xai_target_layers is required")
     if values["frozen"] and governance.get("G0B_PROTOCOL_FREEZE_READY") != "pass":
         raise ValueError("A frozen protocol requires a passing G0B gate")
+    if governance.get("official_training_allowed") and (
+        not values["frozen"] or governance.get("G0B_PROTOCOL_FREEZE_READY") != "pass"
+    ):
+        raise ValueError("Official training requires a frozen protocol and G0B PASS")
+    if governance.get("official_test_evaluation_allowed") and (
+        not governance.get("official_training_allowed")
+        or governance.get("G1_CHECKPOINT_SELECTION") != "pass"
+        or governance.get("G2_TEST_EVALUATION_READY") != "pass"
+    ):
+        raise ValueError("Official test evaluation requires training, G1 and G2 approval")
     xai = values["xai"]
     if not xai.get("target_layer_decision_record"):
         raise ValueError("xai.target_layer_decision_record is required")
@@ -95,6 +105,24 @@ def _validate_protocol(values: dict[str, Any]) -> None:
     transformations = values["transformations"]
     if transformations.get("algorithm_version") != "shared_randomization_v2":
         raise ValueError("Unsupported transformation algorithm version")
+    training = values["training"]
+    if training.get("optimizer") != "adamw":
+        raise ValueError("Only the declared AdamW optimizer is allowed")
+    if training.get("pretrained_weights") != {
+        "resnet50": "IMAGENET1K_V2",
+        "efficientnet_b0": "IMAGENET1K_V1",
+    }:
+        raise ValueError("Training pretrained weight identities are not approved")
+    if training.get("fine_tuning") != "full_model":
+        raise ValueError("Only full-model fine-tuning is approved")
+    if training.get("loss") != "cross_entropy" or training.get("class_weighting") != "none":
+        raise ValueError("Only unweighted cross-entropy is approved")
+    if training.get("scheduler") != "cosine":
+        raise ValueError("Only the declared cosine scheduler is allowed")
+    if training.get("selection_metric") != "validation_macro_f1":
+        raise ValueError("Checkpoint selection must use validation macro-F1")
+    if training.get("deterministic_algorithms") is not True:
+        raise ValueError("training.deterministic_algorithms must be true")
     stats = values["statistics"]
     if stats.get("bootstrap_unit") != "leaf_id":
         raise ValueError("statistics.bootstrap_unit must be leaf_id")

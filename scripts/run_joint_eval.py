@@ -37,14 +37,23 @@ def main() -> int:
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
     resolved = load_protocol(args.protocol)
-    if not resolved.values.get("frozen", False) or resolved.values.get("governance", {}).get("G0B_PROTOCOL_FREEZE_READY") != "pass":
-        raise SystemExit("Joint evaluation requires a frozen protocol with G0B PASS")
+    if not resolved.values.get("governance", {}).get(
+        "official_test_evaluation_allowed", False
+    ):
+        raise SystemExit("Joint evaluation requires G2 official-test approval")
     require_frozen_artifacts(args.manifest)
     records = [record for record in read_manifest_csv(args.manifest) if record.split == "test"]
     if not records:
         raise SystemExit("Manifest has no test records")
     wrapper = ModelWrapper(args.model_id, len(resolved.values["dataset"]["classes"]), pretrained=False)
-    checkpoint_payload = load_checkpoint(wrapper, args.checkpoint, args.device)
+    manifest_sha256 = sha256_file(args.manifest)
+    checkpoint_payload = load_checkpoint(
+        wrapper,
+        args.checkpoint,
+        args.device,
+        expected_protocol_hash=resolved.sha256,
+        expected_manifest_sha256=manifest_sha256,
+    )
     model = wrapper.model.to(args.device)
     target_layer = wrapper.target_layer()
     context = RunContext.create(resolved.values["protocol_version"], resolved.sha256, resolved.sha256, resolved.seed, args.run_id)

@@ -15,8 +15,11 @@ def test_protocol_is_draft_and_fail_closed() -> None:
     assert config.values["governance"]["G0B_PROTOCOL_FREEZE_READY"] == "blocked"
     assert config.values["governance"]["blockers"] == [
         "transformation_severity_pilot_not_executed",
-        "checkpoints_not_selected",
     ]
+    assert config.values["governance"]["G1_CHECKPOINT_SELECTION"] == "blocked"
+    assert config.values["governance"]["G2_TEST_EVALUATION_READY"] == "blocked"
+    assert config.values["governance"]["official_training_allowed"] is False
+    assert config.values["governance"]["official_test_evaluation_allowed"] is False
     assert config.values["xai"]["target_layers"] == {
         "resnet50": "layer4[-1]",
         "efficientnet_b0": "features[-1]",

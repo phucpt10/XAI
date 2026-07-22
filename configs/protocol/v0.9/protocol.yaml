@@ -11,11 +11,21 @@ governance:
   G0B_PROTOCOL_FREEZE_READY: blocked
   blockers:
     - transformation_severity_pilot_not_executed
-    - checkpoints_not_selected
+  G1_CHECKPOINT_SELECTION: blocked
+  checkpoint_blockers:
+    - resnet50_checkpoint_not_selected
+    - efficientnet_b0_checkpoint_not_selected
+  G2_TEST_EVALUATION_READY: blocked
+  test_evaluation_blockers:
+    - protocol_not_frozen
+    - checkpoints_not_approved
+    - final_freeze_artifacts_not_rebound
   evidence_records:
     runtime_readiness: DR-RUNTIME-001
     xai_target_layers: DR-XAI-001
   official_experiment_allowed: false
+  official_training_allowed: false
+  official_test_evaluation_allowed: false
 
 dataset:
   source: "mohanty/PlantVillage"
@@ -46,6 +56,12 @@ models:
 
 training:
   pretrained: true
+  pretrained_weights:
+    resnet50: IMAGENET1K_V2
+    efficientnet_b0: IMAGENET1K_V1
+  fine_tuning: full_model
+  loss: cross_entropy
+  class_weighting: none
   max_epochs: 50
   batch_size: 32
   learning_rate: 0.001
@@ -55,6 +71,7 @@ training:
   early_stopping_patience: 8
   selection_metric: validation_macro_f1
   mixed_precision: true
+  deterministic_algorithms: true
 
 transformations:
   algorithm_version: shared_randomization_v2

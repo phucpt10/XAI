@@ -213,30 +213,58 @@ verifies the pilot artifact hashes before producing four contact sheets:
 ## 6. Train and preserve checkpoints
 
 The training API in `plantxai_stability.training` selects checkpoints only by
-validation macro-F1 and writes both the checkpoint hash and training history.
-For a non-official debugging run while G0B is blocked:
+validation macro-F1. Training is not a prerequisite for G0B: first approve
+severity, freeze the pre-training protocol and regenerate its frozen-data
+record. Checkpoint selection is the subsequent G1 gate. Official test remains
+locked until G2.
+
+Store training state on Google Drive so a Colab disconnect does not destroy it:
+
+```python
+from google.colab import drive
+drive.mount("/content/drive")
+```
+
+After G0B passes, train ResNet50 in a new directory:
 
 ```python
 !python scripts/train_colab.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
-  --manifest /content/plantxai-frozen-data/dataset_manifest.csv \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
   --model-id resnet50 \
-  --output-dir /content/plantxai-runs/draft_smoke/resnet50 \
-  --allow-draft-training \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/resnet50-v1 \
+  --num-workers 0 \
   --device cuda
 ```
 
-After protocol freeze, remove `--allow-draft-training` and train each backbone
-in a separate run directory. The script selects checkpoints only from the
-validation split and writes a checkpoint evidence JSON file.
+At every completed epoch the runner atomically writes `resnet50_latest.pt`,
+updates history, and immediately preserves a new `resnet50_best.pt` when
+validation macro-F1 improves. Resume the same run after interruption:
+
+```python
+!python scripts/train_colab.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
+  --image-root /content/plantxai-manifest-v2 \
+  --model-id resnet50 \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/resnet50-v1 \
+  --num-workers 0 \
+  --device cuda \
+  --resume
+```
+
+Resume is fail-closed: model, class count, protocol hash, manifest hash and all
+training settings must exactly match. Repeat in a distinct directory for
+EfficientNet-B0. `--allow-draft-training` is restricted to non-official smoke
+debugging and cannot produce a G1-approved checkpoint.
 
 Baseline test evaluation is a separate step:
 
 ```python
 !python scripts/evaluate_baseline.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
-  --manifest /content/plantxai-frozen-data/dataset_manifest.csv \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
   --model-id resnet50 \
   --checkpoint /content/plantxai-runs/resnet50/resnet50_best.pt \
@@ -244,8 +272,8 @@ Baseline test evaluation is a separate step:
   --device cuda
 ```
 
-The joint robustness/XAI runner is `scripts/run_joint_eval.py` and requires a
-frozen protocol, a validated checkpoint and the XAI dependencies.
+The baseline and joint robustness/XAI runners both hard-fail until G2 explicitly
+sets `official_test_evaluation_allowed: true` after checkpoint approval.
 
 Keep checkpoints and run outputs outside the source tree or in Git LFS/object
 storage; do not commit model weights to the normal Git history.

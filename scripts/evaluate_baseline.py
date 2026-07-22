@@ -12,6 +12,7 @@ from plantxai_stability.data.freeze import require_frozen_artifacts
 from plantxai_stability.data.loader import PlantDataset, build_torch_dataloader
 from plantxai_stability.data.manifest import read_manifest_csv
 from plantxai_stability.models import ModelWrapper
+from plantxai_stability.provenance import sha256_file
 from plantxai_stability.training import load_checkpoint
 
 
@@ -26,14 +27,24 @@ def main() -> int:
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
     resolved = load_protocol(args.protocol)
-    if not resolved.values.get("frozen", False):
-        raise SystemExit("Baseline test evaluation requires a frozen protocol")
+    if not resolved.values.get("governance", {}).get(
+        "official_test_evaluation_allowed", False
+    ):
+        raise SystemExit("Baseline test evaluation requires G2 official-test approval")
     require_frozen_artifacts(args.manifest)
     records = [record for record in read_manifest_csv(args.manifest) if record.split == "test"]
     if not records:
         raise SystemExit("Manifest has no test records")
     wrapper = ModelWrapper(args.model_id, len(resolved.values["dataset"]["classes"]), pretrained=False)
-    payload = load_checkpoint(wrapper, args.checkpoint, args.device)
+    manifest_sha256 = sha256_file(args.manifest)
+    load_checkpoint(
+        wrapper,
+        args.checkpoint,
+        args.device,
+        expected_protocol_hash=resolved.sha256,
+        expected_manifest_sha256=manifest_sha256,
+    )
+    checkpoint_sha256 = sha256_file(args.checkpoint)
     dataset = PlantDataset(
         records,
         args.image_root,
@@ -63,7 +74,7 @@ def main() -> int:
             for sample_id, label, pred, conf in zip(batch["sample_id"], batch["label"].tolist(), classes.tolist(), confidence.tolist()):
                 truth.append(int(label))
                 predicted.append(int(pred))
-                rows.append({"sample_id": sample_id, "model_id": args.model_id, "true_class": int(label), "predicted_class": int(pred), "confidence": float(conf), "checkpoint_sha256": payload.get("checkpoint_sha256")})
+                rows.append({"sample_id": sample_id, "model_id": args.model_id, "true_class": int(label), "predicted_class": int(pred), "confidence": float(conf), "checkpoint_sha256": checkpoint_sha256})
     args.output_dir.mkdir(parents=True, exist_ok=True)
     with (args.output_dir / "baseline_predictions.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
