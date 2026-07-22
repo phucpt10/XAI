@@ -117,11 +117,11 @@ modeling manifest:
   --governance-dataset-receipt /content/plantxai-tomato-inspection-v1/dataset_receipt.json \
   --quarantine-adjudication-summary /content/plantxai-quarantine-v1/quarantine_adjudication_summary.json \
   --quarantine-decision-registry /content/plantxai-quarantine-v1/quarantine_decision_registry.parquet \
-  --output-dir /content/plantxai-manifest-v1
+  --output-dir /content/plantxai-manifest-v2
 ```
 
 The `--manifest` option also exports audited RGB PNGs under
-`/content/plantxai-manifest-v1/images`, so the existing filesystem-backed
+`/content/plantxai-manifest-v2/images`, so the existing filesystem-backed
 PyTorch loader can consume exactly the hashed pixels. The manifest preserves
 the upstream `train`/`test` assignment and records canonical RGB hashes,
 dimensions, class labels and `leaf_id`. It also writes the 8,398-row
@@ -129,6 +129,26 @@ dimensions, class labels and `leaf_id`. It also writes the 8,398-row
 8,393-row eligible `manifest.csv`. A source-derived reconstruction is
 allowed only when its Decision Record and evidence gate are approved; an
 unresolved group key is always a hard audit failure.
+
+The pixel audit for the pinned data finds nine additional train-only duplicate
+pairs. Every pair has one class and one leaf. Apply `DR-DUP-001` to retain the
+minimum stable sample ID and quarantine the redundant copy:
+
+```python
+!python scripts/adjudicate_exact_duplicates.py \
+  --manifest /content/plantxai-manifest-v2/manifest.csv \
+  --lineage-manifest /content/plantxai-manifest-v2/dataset_lineage_manifest.parquet \
+  --quarantine-registry /content/plantxai-manifest-v2/quarantine_registry.parquet \
+  --quarantine-summary /content/plantxai-manifest-v2/quarantine_summary.json \
+  --decision-record configs/protocol/v0.9/decision_records/DR-DUP-001.yaml \
+  --output-dir /content/plantxai-manifest-v3
+```
+
+The final reconciliation must contain 8,384 eligible samples, 14 quarantined
+train samples, 6,691 eligible source-train samples, all 1,693 official test
+samples and a passing eligible image audit. The RGB files remain under
+`/content/plantxai-manifest-v2/images`; v3 contains the final governance and
+manifest artifacts only.
 
 Do not replace missing identity with a row index, traversal order or arbitrary
 synthetic `leaf_id`.
@@ -139,11 +159,11 @@ manifest and create immutable split evidence:
 ```python
 !python scripts/freeze_dataset.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
-  --manifest /content/plantxai-manifest-v1/manifest.csv \
+  --manifest /content/plantxai-manifest-v3/manifest.csv \
   --class-selection-dr configs/protocol/v0.9/decision_records/DR-CLASS-001.yaml \
-  --quarantine-dr configs/protocol/v0.9/decision_records/DR-LEAF-002.yaml \
-  --quarantine-registry /content/plantxai-manifest-v1/quarantine_registry.parquet \
-  --quarantine-summary /content/plantxai-manifest-v1/quarantine_summary.json \
+  --quarantine-dr configs/protocol/v0.9/decision_records/DR-DUP-001.yaml \
+  --quarantine-registry /content/plantxai-manifest-v3/quarantine_registry.parquet \
+  --quarantine-summary /content/plantxai-manifest-v3/quarantine_summary.json \
   --audit-identity /content/plantxai-tomato-inspection-v1/dataset_receipt.json \
   --output-dir /content/plantxai-frozen-data
 ```
@@ -160,7 +180,7 @@ For a non-official debugging run while G0B is blocked:
 !python scripts/train_colab.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-data/dataset_manifest.csv \
-  --image-root /content/plantxai-manifest-v1 \
+  --image-root /content/plantxai-manifest-v2 \
   --model-id resnet50 \
   --output-dir /content/plantxai-runs/draft_smoke/resnet50 \
   --allow-draft-training \
@@ -177,7 +197,7 @@ Baseline test evaluation is a separate step:
 !python scripts/evaluate_baseline.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-data/dataset_manifest.csv \
-  --image-root /content/plantxai-manifest-v1 \
+  --image-root /content/plantxai-manifest-v2 \
   --model-id resnet50 \
   --checkpoint /content/plantxai-runs/resnet50/resnet50_best.pt \
   --output-dir /content/plantxai-runs/resnet50/baseline \

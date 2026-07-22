@@ -12,7 +12,6 @@ governance:
   blockers:
     - dataset_receipt_not_reviewed
     - image_audit_not_passed
-    - class_selection_decision_record_not_approved
     - quarantine_adjudication_not_materialized
     - audited_manifest_not_built
     - immutable_split_artifacts_not_written
@@ -36,7 +35,7 @@ dataset:
   official_test_policy: preserve
   quarantine_policy:
     enabled: true
-    decision_record: DR-LEAF-002
+    decision_record: DR-DUP-001
     official_test_action: preserve_exactly
     train_test_leaf_overlap_action: quarantine_source_train
   image_size: [224, 224]

@@ -17,6 +17,9 @@ Date: 2026-07-22
   and quarantines exactly five approved source-train overlap samples.
 - Two-stage quarantine evidence: metadata adjudication followed by a finalized
   pixel-identified registry, all-sample lineage manifest and reconciliation gate.
+- Approved `DR-DUP-001` policy for nine train-only, same-class, same-leaf exact
+  duplicate pairs; it retains the minimum stable sample ID and quarantines the
+  other nine samples without modifying official test.
 - Image-level audit artifacts (`dataset_receipt.json`, `image_audit.parquet`),
   duplicate/label/leaf conflict detection and immutable freeze artifacts.
 - Deterministic class-stratified leaf split construction and DataLoader hash,
@@ -36,7 +39,7 @@ Date: 2026-07-22
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (24 tests)
+pytest                          PASS (26 tests)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -60,9 +63,12 @@ reconstructed leaf identities shared by upstream train and test (10 affected
 samples). `DR-LEAF-001` records the failed raw-source gate. The project owner
 approved `DR-LEAF-002`: preserve all 1,693 official test samples and quarantine
 the five source-train counterparts, leaving 8,393 eligible modeling samples.
-Metadata adjudication passes locally; Colab must still materialize pixels and
-finalize the registry before freeze. No model accuracy, confidence interval,
-p-value or XAI stability result has been produced.
+Colab materialization confirmed the first quarantine and found nine remaining
+benign train-only duplicate pairs. `DR-DUP-001` defines the cumulative final
+universe: 8,384 eligible samples, 14 quarantined train samples and all 1,693
+official test samples preserved. Final duplicate adjudication must be
+materialized before freeze. No model accuracy, confidence interval, p-value or
+XAI stability result has been produced.
 
 1. Audit the pinned dataset revision (`9e97599868962bd0079b8db4b7f1efa9185fa1e7`).
 2. Materialize the approved quarantine registry and reconcile all 8,398 rows.

@@ -13,6 +13,7 @@ from plantxai_stability.provenance import sha256_file
 
 
 TRAIN_OVERLAP_REASON = "TRAIN_SAMPLE_QUARANTINED_TEST_LEAF_OVERLAP"
+TRAIN_DUPLICATE_REASON = "TRAIN_EXACT_PIXEL_DUPLICATE_REDUNDANT"
 
 
 def _source_key(row: Mapping[str, Any]) -> tuple[str, int, str, str]:
@@ -223,6 +224,78 @@ def apply_quarantine_registry(
     return eligible, finalized_registry, lineage, summary
 
 
+def adjudicate_redundant_train_duplicates(
+    records: Iterable[SampleRecord],
+    *,
+    approved_quarantined_sample_ids: Iterable[str],
+    decision_record_id: str,
+    expected_group_count: int,
+) -> tuple[list[dict[str, Any]], list[SampleRecord], dict[str, Any]]:
+    """Keep one deterministic representative from benign train duplicate pairs."""
+    materialized = list(records)
+    by_hash: dict[str, list[SampleRecord]] = defaultdict(list)
+    for record in materialized:
+        by_hash[record.canonical_rgb_sha256].append(record)
+    duplicate_groups = {
+        digest: sorted(items, key=lambda item: item.sample_id)
+        for digest, items in by_hash.items()
+        if len(items) > 1
+    }
+    candidates: list[dict[str, Any]] = []
+    selected: list[SampleRecord] = []
+    group_checks: dict[str, bool] = {}
+    for digest, items in sorted(duplicate_groups.items()):
+        valid_group = (
+            len(items) == 2
+            and {item.source_split for item in items} == {"train"}
+            and len({item.class_name for item in items}) == 1
+            and len({item.leaf_id for item in items}) == 1
+        )
+        group_checks[digest] = valid_group
+        if not valid_group:
+            raise ValueError(
+                "Automatic redundant-copy quarantine requires a two-sample, "
+                f"train-only, same-class, same-leaf group: {digest}"
+            )
+        retained = items[0]
+        redundant = items[1]
+        selected.append(redundant)
+        for record in items:
+            candidates.append(
+                {
+                    **asdict(record),
+                    "duplicate_group_sha256": digest,
+                    "adjudication_action": (
+                        "retain_deterministic_representative"
+                        if record.sample_id == retained.sample_id
+                        else "quarantine_redundant_copy"
+                    ),
+                    "representative_sample_id": retained.sample_id,
+                    "decision_record_id": decision_record_id,
+                }
+            )
+    approved_ids = set(approved_quarantined_sample_ids)
+    detected_ids = {record.sample_id for record in selected}
+    criteria = {
+        "duplicate_group_count_matches": len(duplicate_groups) == expected_group_count,
+        "all_groups_are_benign_train_pairs": all(group_checks.values()),
+        "deterministic_selection_matches_decision_record": detected_ids == approved_ids,
+        "official_test_untouched": all(record.source_split == "train" for record in selected),
+    }
+    summary: dict[str, Any] = {
+        "decision_record_id": decision_record_id,
+        "policy": "retain_minimum_sample_id_and_quarantine_redundant_train_copy",
+        "input_eligible_sample_count": len(materialized),
+        "duplicate_group_count": len(duplicate_groups),
+        "duplicate_sample_count": sum(len(items) for items in duplicate_groups.values()),
+        "newly_quarantined_sample_count": len(selected),
+        "quarantined_sample_ids": sorted(detected_ids),
+        "acceptance_criteria": criteria,
+        "passed": all(criteria.values()),
+    }
+    return candidates, selected, summary
+
+
 def _write_parquet(rows: Iterable[Mapping[str, Any]], path: Path) -> None:
     try:
         import pandas as pd
@@ -269,6 +342,20 @@ def write_quarantine_adjudication_artifacts(
         json.dumps(resolved_summary, indent=2, sort_keys=True), encoding="utf-8"
     )
     return {path.name: sha256_file(path) for path in paths}
+
+
+def write_duplicate_adjudication_artifact(
+    rows: Iterable[Mapping[str, Any]], path: str | Path
+) -> str:
+    """Write the immutable two-row-per-group duplicate decision table."""
+    output = Path(path)
+    if output.exists():
+        raise FileExistsError(
+            f"Duplicate adjudication artifact already exists; create a new version: {output}"
+        )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    _write_parquet(rows, output)
+    return sha256_file(output)
 
 
 def write_quarantine_manifest_artifacts(

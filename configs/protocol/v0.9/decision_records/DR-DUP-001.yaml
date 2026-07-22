@@ -1,0 +1,87 @@
+decision_id: DR-DUP-001
+title: Quarantine redundant exact-pixel copies within source train leaves
+status: approved
+decision_type: iterative_quarantine_adjudication
+incorporates:
+  - DR-LEAF-002
+dataset_id: mohanty/PlantVillage
+dataset_configuration: color
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+selected_classes:
+  - Tomato___healthy
+  - Tomato___Bacterial_spot
+  - Tomato___Early_blight
+  - Tomato___Late_blight
+  - Tomato___Septoria_leaf_spot
+policy:
+  name: retain_minimum_sample_id_and_quarantine_redundant_train_copy
+  eligible_group_shape: exactly_two_samples
+  required_source_split: train
+  required_class_count: 1
+  required_leaf_count: 1
+  representative_rule: lexicographically_minimum_sample_id
+  quarantine_reason_code: TRAIN_EXACT_PIXEL_DUPLICATE_REDUNDANT
+  official_test_action: preserve_exactly
+  silent_drop_allowed: false
+  performance_based_exclusion_allowed: false
+approved_groups:
+  - leaf_id: fallback_GH_HL Leaf 389
+    retained_sample_id: pv_40e77d27adb10b7b
+    quarantined_sample_id: pv_a1bbd303606348f1
+  - leaf_id: fallback_GHLB2 Leaf 8677
+    retained_sample_id: pv_72d5d0ace042afbc
+    quarantined_sample_id: pv_f2b2e41d24a514a5
+  - leaf_id: fallback_GH_HL Leaf 434
+    retained_sample_id: pv_9c9db639ff16c705
+    quarantined_sample_id: pv_af59cdb576a9d8c8
+  - leaf_id: fallback_GH_HL Leaf 342.1
+    retained_sample_id: pv_25ae712e2622eaa5
+    quarantined_sample_id: pv_82d4eae0d7de4d4f
+  - leaf_id: fallback_GHLB_PS Leaf 24 Day 13
+    retained_sample_id: pv_081f954109cbd965
+    quarantined_sample_id: pv_eb3b9176afee6cf2
+  - leaf_id: fallback_GHLB2 Leaf 9011
+    retained_sample_id: pv_5e53c63eb9cafce0
+    quarantined_sample_id: pv_8c797f69d186e479
+  - leaf_id: fallback_GHLB_PS Leaf 23.5 Day 13
+    retained_sample_id: pv_bd81d3a27b8ae5b9
+    quarantined_sample_id: pv_e0dc55aeb7c4b631
+  - leaf_id: fallback_GH_HL Leaf 482.2
+    retained_sample_id: pv_1d43c31a366747a4
+    quarantined_sample_id: pv_d1a73e6cceeb00e2
+  - leaf_id: fallback_GHLB2 Leaf 102
+    retained_sample_id: pv_111b575b073e7959
+    quarantined_sample_id: pv_7696638c01fddcd1
+expected_counts:
+  audited_samples: 8398
+  prior_eligible_samples: 8393
+  duplicate_groups: 9
+  duplicate_samples: 18
+  newly_quarantined_samples: 9
+  quarantined_source_train_samples: 14
+  eligible_source_train_samples: 6691
+  official_test_samples: 1693
+  eligible_modeling_samples: 8384
+  eligible_counts_by_class:
+    Tomato___Bacterial_spot: 2127
+    Tomato___Early_blight: 1000
+    Tomato___Late_blight: 1901
+    Tomato___Septoria_leaf_spot: 1771
+    Tomato___healthy: 1585
+evidence:
+  dataset_receipt_sha256: 915d63d4c8b66b7d8f0b3121eac5bfa3b68c0ebc4ce237c003d5f3818c97062e
+  prior_quarantine_summary_sha256: 225049d58788c304eb34641e7dd1a29bb57b96a9a0e242f30dc7ca06c0a8868d
+  prior_dataset_lineage_manifest_sha256: 96eb14ae2d0dcf3a5d31f5ca0a6d5082d9b561c9c08b3543d8346260ba2b7a18
+  prior_quarantine_registry_sha256: 2763d46442e9058839012964ff8bd4e63af71c2a46a4a58b47635fa6df3167ee
+rationale: >-
+  All nine remaining exact-pixel duplicate groups are train-only pairs with one
+  class and one leaf identity. Keeping both copies would double-weight identical
+  pixels from those leaves during model fitting. The minimum stable sample_id is
+  retained and the other source sample is quarantined without consulting model
+  performance or modifying official test.
+selection_used_official_test_performance: false
+approved_by: project_owner
+approval_basis: >-
+  Previously approved governed quarantine mechanism plus the reported duplicate
+  group audit showing nine train-only, same-class, same-leaf pairs.
+approved_at_utc: 2026-07-22

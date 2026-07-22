@@ -5,6 +5,7 @@ import pytest
 from plantxai_stability.data.manifest import build_manifest
 from plantxai_stability.data.quarantine import (
     TRAIN_OVERLAP_REASON,
+    adjudicate_redundant_train_duplicates,
     adjudicate_train_test_leaf_overlap,
     apply_quarantine_registry,
     write_quarantine_adjudication_artifacts,
@@ -108,3 +109,34 @@ def test_quarantine_artifacts_are_immutable(tmp_path: Path):
     assert "quarantine_decision_registry.parquet" in hashes
     with pytest.raises(FileExistsError):
         write_quarantine_adjudication_artifacts([candidate], [registry], summary, tmp_path)
+
+
+def test_redundant_train_duplicate_keeps_minimum_sample_id():
+    first = _manifest_row("train", 1, "same-leaf")
+    second = _manifest_row("train", 2, "same-leaf")
+    second["canonical_rgb_sha256"] = first["canonical_rgb_sha256"]
+    records = build_manifest([first, second])
+    expected_quarantine = max(record.sample_id for record in records)
+    candidates, quarantined, summary = adjudicate_redundant_train_duplicates(
+        records,
+        approved_quarantined_sample_ids=[expected_quarantine],
+        decision_record_id="DR-DUP-001",
+        expected_group_count=1,
+    )
+    assert summary["passed"] is True
+    assert quarantined[0].sample_id == expected_quarantine
+    assert len(candidates) == 2
+
+
+def test_redundant_duplicate_policy_rejects_test_pairs():
+    first = _manifest_row("test", 1, "same-leaf")
+    second = _manifest_row("test", 2, "same-leaf")
+    second["canonical_rgb_sha256"] = first["canonical_rgb_sha256"]
+    records = build_manifest([first, second])
+    with pytest.raises(ValueError, match="train-only"):
+        adjudicate_redundant_train_duplicates(
+            records,
+            approved_quarantined_sample_ids=[],
+            decision_record_id="DR-DUP-001",
+            expected_group_count=1,
+        )
