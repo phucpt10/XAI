@@ -193,6 +193,18 @@ increasing median RMSE from mild to moderate to severe for each transformation.
 The report remains `pending_human_review`; it must not change the protocol or
 remove the severity blocker automatically.
 
+Render one deterministic validation example per class for human review. This
+verifies the pilot artifact hashes before producing four contact sheets:
+
+```python
+!python scripts/render_severity_review.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
+  --image-root /content/plantxai-manifest-v2 \
+  --pilot-summary /content/plantxai-severity-pilot-v1/severity_pilot_summary.json \
+  --output-dir /content/plantxai-severity-review-v1
+```
+
 ## 6. Train and preserve checkpoints
 
 The training API in `plantxai_stability.training` selects checkpoints only by
