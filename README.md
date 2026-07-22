@@ -36,6 +36,9 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Optional PyTorch model wrappers for ResNet50 and EfficientNet-B0.
 - Epoch-resumable Colab training with atomic latest/best checkpoints, complete
   optimizer/RNG state and protocol/manifest lineage enforcement.
+- Validation-only checkpoint audit with exact identity coverage, per-class
+  precision/recall/F1, confusion matrices, probability records and immutable
+  artifact hashes; official test pixels remain inaccessible before G2.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.

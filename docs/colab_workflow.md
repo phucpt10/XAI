@@ -320,6 +320,43 @@ training settings must exactly match. Repeat in a distinct directory for
 EfficientNet-B0. `--allow-draft-training` is restricted to non-official smoke
 debugging and cannot produce a G1-approved checkpoint.
 
+Audit each validation-selected best checkpoint before G1 approval. The audit
+loads validation pixels only, reproduces the selected macro-F1, verifies exact
+sample identity coverage and writes per-class metrics, a confusion matrix and
+per-sample class probabilities. It hard-fails on any checkpoint, protocol,
+manifest, freeze-record or training-evidence mismatch.
+
+```python
+!python scripts/audit_validation_checkpoint.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
+  --image-root /content/plantxai-manifest-v2 \
+  --model-id resnet50 \
+  --checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_best.pt \
+  --checkpoint-evidence /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_checkpoint_evidence.json \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/validation-audit-v1 \
+  --num-workers 4 \
+  --device cuda
+```
+
+```python
+!python scripts/audit_validation_checkpoint.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
+  --image-root /content/plantxai-manifest-v2 \
+  --model-id efficientnet_b0 \
+  --checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/efficientnet_b0_best.pt \
+  --checkpoint-evidence /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/efficientnet_b0_checkpoint_evidence.json \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/validation-audit-v1 \
+  --num-workers 4 \
+  --device cuda
+```
+
+Both reports must state `source_split: validation`,
+`test_split_accessed: false`, `sample_coverage_exact: true` and
+`selected_macro_f1_reproduced: true`. These are G1 candidate artifacts, not
+official test results. Do not compare or select checkpoints using test data.
+
 Baseline test evaluation is a separate step:
 
 ```python

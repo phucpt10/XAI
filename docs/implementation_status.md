@@ -37,6 +37,9 @@ Date: 2026-07-23
   evidence recorded by `DR-RUNTIME-001`.
 - Colab-ready resumable training with epoch-boundary state, validation-selected
   best checkpoints, lineage validation and test-gated evaluation scripts.
+- Validation-only G1 checkpoint audit with checkpoint/training/freeze lineage,
+  exact sample coverage, per-class metrics, confusion matrices, NLL, Brier
+  score, deterministic prediction records and immutable hashes.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
@@ -46,7 +49,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (44 tests; torch integration skipped when unavailable)
+pytest                          PASS (48 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
