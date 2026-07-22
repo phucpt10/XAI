@@ -1,0 +1,106 @@
+decision_id: DR-TEST-001
+title: Authorization of the registered official-test evaluation campaign
+status: approved
+decision_type: g2_official_test_evaluation_authorization
+approved_at_utc: 2026-07-23
+approved_by: project_owner
+
+readiness_evidence:
+  report_sha256: e80184dd2e6d7c55df66eb266a94ec33addda8048731fdaa26a8195f8e82a7bc
+  run_type: metadata_only_g2_readiness
+  technical_gate_passed: true
+  approval_status_before_decision: pending_g2_human_review
+  readiness_git_commit: 35a539dad9bf10eae1e6ed106ad7dff4399821bd
+  g1_governance_protocol_hash: 88440f4e740a707e128cb80d0680dca4f38c104388f51d9493b5b1adb76affe9
+  checkpoint_training_protocol_hash: 7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b
+  checkpoint_decision_record_id: DR-CHECKPOINT-001
+  checkpoint_decision_record_sha256: 090eb65a7e07a28c6fa928aa5f8a4effd15be2cc661561f36d1a0998fd455a50
+  manifest_sha256: 323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894
+  freeze_record_sha256: aed2e96afd2749250d4151780bb4002d198eb96d7433d2bef5b03d4a6ac9212d
+  split_summary_sha256: 3d6ffc612107ebdbb947e6e8c23b1a5b17d4b033a226349efc91e66c05d5751a
+  official_test_pixels_accessed: false
+  official_test_result_computed: false
+
+official_test_identity:
+  sample_count: 1693
+  leaf_count: 770
+  sample_ids_sha256: 585529885e825889f83ee13b0746d5e9bf665f5ac2363becfeae64444a5b53cd
+  leaf_ids_sha256: c4a8de4c039f3a3dde33894fadcdf380340be90e6fc56e6669c3b481052d052a
+  source_membership_preserved_exactly: true
+
+registered_campaign:
+  campaign_id: plantxai-official-test-v1
+  models:
+    - resnet50
+    - efficientnet_b0
+  evaluation_components:
+    - baseline_prediction
+    - joint_prediction_robustness_and_xai_stability
+  scenario_ids:
+    - rotation_mild
+    - rotation_moderate
+    - rotation_severe
+    - brightness_mild
+    - brightness_moderate
+    - brightness_severe
+    - gaussian_noise_mild
+    - gaussian_noise_moderate
+    - gaussian_noise_severe
+    - gaussian_blur_mild
+    - gaussian_blur_moderate
+    - gaussian_blur_severe
+  xai_methods:
+    - grad_cam
+    - grad_cam_plus_plus
+    - score_cam
+  xai_alignment_policy: forward_align_original_cam
+  valid_region_policy: geometric_support_mask
+  target_class_policy: original_predicted_class
+  prediction_consistency_required: true
+  rotation_prediction_claim_scope: zero_filled_operator_specific
+  severity_comparison_scope: within_transformation_only
+
+approved_checkpoints:
+  resnet50: b508abd2851c5f576131db0e47447624cd78f1e3204c2931f7928c266f0c7bfc
+  efficientnet_b0: 05b592f1ff7f4f2b4a757ae2564a088e3742555e20110ee33d19e563ff2fe60b
+
+execution_policy:
+  one_registered_campaign: true
+  immutable_versioned_outputs: true
+  no_overwrite: true
+  no_checkpoint_reselection_after_test: true
+  no_model_or_hyperparameter_tuning_after_test: true
+  no_transformation_or_xai_tuning_after_test: true
+  infrastructure_retry_policy: >-
+    A failed or interrupted job may resume or restart only with identical
+    protocol, checkpoint, manifest, seed, scenario and method identities. Every
+    retry must be recorded; selective reruns based on observed performance are
+    prohibited.
+  runtime_authorization_requirement: >-
+    Every official runner must validate this Decision Record, the readiness
+    report, DR-CHECKPOINT-001 and all cryptographic identities before opening
+    any official-test image.
+
+governance_effect:
+  governance_protocol_hash: ceaef8a293b877c61a81f046dbcca5ec9abdf7092c38e43fb1aa6225e76d8b02
+  G2_TEST_EVALUATION_READY: pass
+  test_evaluation_blockers: []
+  official_experiment_allowed: true
+  official_test_evaluation_allowed: true
+  operational_state: approved_pending_runtime_authorization_gate_verification
+
+decision: >-
+  Authorize the single registered official-test campaign for both approved
+  backbones. Authorization is conditional on a passing fail-closed runtime
+  gate. This decision prohibits using official-test observations to reselect or
+  tune checkpoints, models, transformations or XAI methods.
+
+project_owner_approval: >-
+  Tôi phê duyệt G2 dựa trên readiness report SHA
+  e80184dd2e6d7c55df66eb266a94ec33addda8048731fdaa26a8195f8e82a7bc.
+  Cho phép một chiến dịch official-test evaluation đã đăng ký cho cả ResNet50
+  và EfficientNet-B0, gồm baseline prediction và joint robustness/XAI theo 12
+  scenario, 3 CAM methods và protocol đã khóa. Không sử dụng kết quả test để
+  chọn lại hoặc tinh chỉnh mô hình, transformation hay XAI. Cho phép tạo
+  DR-TEST-001 và triển khai cổng authorization fail-closed; chưa chạy test cho
+  đến khi cổng này được kiểm chứng.

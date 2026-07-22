@@ -12,17 +12,17 @@ governance:
   blockers: []
   G1_CHECKPOINT_SELECTION: pass
   checkpoint_blockers: []
-  G2_TEST_EVALUATION_READY: blocked
-  test_evaluation_blockers:
-    - final_freeze_artifacts_not_rebound
+  G2_TEST_EVALUATION_READY: pass
+  test_evaluation_blockers: []
   evidence_records:
     runtime_readiness: DR-RUNTIME-001
     xai_target_layers: DR-XAI-001
     transformation_severity: DR-SEVERITY-006
     checkpoint_selection: DR-CHECKPOINT-001
-  official_experiment_allowed: false
+    test_evaluation: DR-TEST-001
+  official_experiment_allowed: true
   official_training_allowed: true
-  official_test_evaluation_allowed: false
+  official_test_evaluation_allowed: true
 
 dataset:
   source: "mohanty/PlantVillage"

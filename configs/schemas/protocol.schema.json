@@ -33,7 +33,8 @@
             "runtime_readiness": {"type": "string", "minLength": 1},
             "xai_target_layers": {"type": "string", "minLength": 1},
             "transformation_severity": {"type": "string", "minLength": 1},
-            "checkpoint_selection": {"type": "string", "minLength": 1}
+            "checkpoint_selection": {"type": "string", "minLength": 1},
+            "test_evaluation": {"type": "string", "minLength": 1}
           }
         },
         "official_experiment_allowed": {"type": "boolean"},

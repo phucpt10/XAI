@@ -2,11 +2,11 @@
 
 PlantXAI-Stability is research software for evaluating prediction robustness and XAI explanation stability under controlled image transformations.
 
-The implementation follows the English specification in `PlantXAI-Stability_Research_Software_Specification_En.docx`. G1 is approved after validation-only selection and audit of both declared backbones. Official test evaluation remains independently fail-closed at G2.
+The implementation follows the English specification in `PlantXAI-Stability_Research_Software_Specification_En.docx`. G2 authorizes one registered official-test campaign after validation-only checkpoint selection and metadata-only readiness review. Every runner remains fail-closed until the runtime authorization chain passes.
 
 ## Current implementation
 
-- Versioned G1-approved protocol at `configs/protocol/v0.9/protocol.yaml`.
+- Versioned G2-approved protocol at `configs/protocol/v0.9/protocol.yaml`.
 - JSON schema and fail-closed protocol loader.
 - Immutable data contracts for samples, predictions, transformations and joint records.
 - Canonical RGB hashing and deterministic `sample_id` construction.
@@ -44,6 +44,8 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Metadata-only G2 readiness gate that reconciles both checkpoint registries,
   validation audits and all child artifact hashes while enumerating official
   test identities without decoding test images or computing test results.
+- Approved `DR-TEST-001` registered-campaign authorization plus a metadata-only
+  runtime verification command required before any official-test runner.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.
@@ -62,8 +64,9 @@ python -m plantxai_stability.cli smoke configs/protocol/v0.9/protocol.yaml
 ```
 
 Official training additionally requires a frozen dataset record whose protocol
-hash exactly matches its training protocol. Both checkpoints have G1 approval,
-but official test evaluation remains blocked until the separate G2 gate passes.
+hash exactly matches its training protocol. G2 is approved, but baseline and
+joint runners also require the exact readiness report and both Decision Records;
+a boolean protocol flag alone cannot authorize pixel access.
 
 ## Official-run prerequisites
 

@@ -4,7 +4,7 @@ Date: 2026-07-23
 
 ## Implemented
 
-- Protocol v0.9 advanced to approved G1 with fail-closed G2 validation.
+- Protocol v0.9 advanced to approved G2 with fail-closed runtime authorization.
 - Stable sample identity and canonical RGB hashing.
 - Hugging Face adapter for `mohanty/PlantVillage` (`color`) with schema
   inspection, explicit `leaf_id` checks and optional manifest materialisation.
@@ -46,6 +46,9 @@ Date: 2026-07-23
 - Metadata-only G2 readiness report generator. It verifies both checkpoint and
   validation-audit trees, frozen split invariants and official-test identity
   counts while guaranteeing that no official-test image is decoded.
+- Approved `DR-TEST-001` for one registered baseline and joint robustness/XAI
+  campaign, with a separate metadata-only authorization verification required
+  before official-test pixel access.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
@@ -55,7 +58,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (55 tests; torch integration skipped when unavailable)
+pytest                          PASS (60 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -64,9 +67,9 @@ constant heatmap gate          PASS
 
 ## Official experiment status
 
-Official test evaluation is intentionally blocked. Official training is
-authorized only with a freeze record matching the final G0B hash. The protocol
-currently has:
+G2 governance is approved for one registered campaign, but operational test
+access remains fail-closed until the runtime authorization verifier passes.
+Official training remains bound to the final G0B freeze. The protocol has:
 
 ```text
 status: frozen
@@ -74,10 +77,10 @@ frozen: true
 G0A_BOOTSTRAP_READY: PASS
 G0B_PROTOCOL_FREEZE_READY: PASS
 G1_CHECKPOINT_SELECTION: PASS
-G2_TEST_EVALUATION_READY: BLOCKED
+G2_TEST_EVALUATION_READY: PASS
 official_training_allowed: true
-official_test_evaluation_allowed: false
-official_experiment_allowed: false
+official_test_evaluation_allowed: true
+official_experiment_allowed: true
 ```
 
 The pinned metadata audit covers all 8,398 selected samples and found five
@@ -105,10 +108,11 @@ rewritten or re-signed. The resulting G1 governance protocol hash is
 
 The remaining work is staged as follows:
 
-1. Bind the final test-evaluation freeze/governance lineage without changing
-   the selected checkpoint bytes or scientific configuration.
-2. G2: approve the one-time official-test evaluation and explicitly unlock it.
-3. Run baseline and joint prediction/XAI evaluation only after every G2 gate passes.
+1. Run and preserve the metadata-only G2 runtime-authorization verification.
+2. Review that verification artifact, then run one baseline pass for each
+   approved checkpoint in distinct immutable output directories.
+3. Run the registered joint prediction/XAI campaign with identical frozen
+   identities and preserve all provenance, exclusion and retry records.
 
 Severity pilot v1 passed its original numerical gate but failed human visual
 review because brightness and rotation direction, and the Gaussian base-noise

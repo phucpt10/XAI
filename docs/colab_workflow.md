@@ -393,11 +393,31 @@ metric. G2 must still be blocked when this command runs.
   --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/g2-readiness-v1
 ```
 
-The report must end with `G2 readiness technical gate: PASS`, retain
+The historical pre-authorization report must end with `G2 readiness technical gate: PASS`, retain
 `approval_status: pending_g2_human_review`, state
 `official_test.pixels_accessed: false` and leave both G2 and official-test
 evaluation disabled. Record the separately printed report SHA-256 for the G2
 Decision Record. Do not run baseline or joint evaluation after this preflight.
+
+After project-owner approval creates `DR-TEST-001`, pull the G2 code and verify
+the complete authorization chain. This command still reads manifest metadata
+only and must report that no test pixel or result was accessed:
+
+```python
+!python scripts/verify_g2_authorization.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
+  --checkpoint-decision-record configs/protocol/v0.9/decision_records/DR-CHECKPOINT-001.yaml \
+  --test-decision-record configs/protocol/v0.9/decision_records/DR-TEST-001.yaml \
+  --g2-readiness-report /content/drive/MyDrive/PlantXAI-Stability/runs/g2-readiness-v1/g2_readiness_report.json \
+  --resnet50-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_best.pt \
+  --efficientnet-b0-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/efficientnet_b0_best.pt \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/g2-authorization-v1
+```
+
+Stop after `G2 authorization gate: PASS` and preserve its printed report hash.
+Do not start baseline or joint evaluation until this verification artifact has
+been reviewed.
 
 Baseline test evaluation is a separate step:
 
@@ -407,18 +427,23 @@ Baseline test evaluation is a separate step:
   --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
   --model-id resnet50 \
-  --checkpoint /content/plantxai-runs/resnet50/resnet50_best.pt \
-  --output-dir /content/plantxai-runs/resnet50/baseline \
+  --checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_best.pt \
+  --checkpoint-decision-record configs/protocol/v0.9/decision_records/DR-CHECKPOINT-001.yaml \
+  --test-decision-record configs/protocol/v0.9/decision_records/DR-TEST-001.yaml \
+  --g2-readiness-report /content/drive/MyDrive/PlantXAI-Stability/runs/g2-readiness-v1/g2_readiness_report.json \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/resnet50-baseline \
+  --num-workers 4 \
   --device cuda
 ```
 
-The baseline and joint robustness/XAI runners both hard-fail until G2 explicitly
-sets `official_test_evaluation_allowed: true` after checkpoint approval.
+The baseline and joint runners recompute the full authorization chain before
+opening a test image. A G2 flag without matching Decision Records, readiness
+hash, checkpoint bytes, manifest/freeze lineage and test identities hard-fails.
 
 Keep checkpoints and run outputs outside the source tree or in Git LFS/object
 storage; do not commit model weights to the normal Git history.
 
-## 7. Export results
+## 8. Export results
 
 Every run must have a unique `run_id` and write resolved configuration,
 predictions, heatmaps, metrics, statistics, tables, figures, logs and a

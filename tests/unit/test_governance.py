@@ -74,7 +74,9 @@ def test_repository_g1_decision_binds_both_approved_checkpoints() -> None:
             "configs/protocol/v0.9/decision_records/DR-CHECKPOINT-001.yaml"
         ).read_text(encoding="utf-8")
     )
-    assert decision["governance_effect"]["governance_protocol_hash"] == protocol.sha256
+    assert decision["governance_effect"]["governance_protocol_hash"] == (
+        "88440f4e740a707e128cb80d0680dca4f38c104388f51d9493b5b1adb76affe9"
+    )
     expected_hashes = {
         "resnet50": "b508abd2851c5f576131db0e47447624cd78f1e3204c2931f7928c266f0c7bfc",
         "efficientnet_b0": "05b592f1ff7f4f2b4a757ae2564a088e3742555e20110ee33d19e563ff2fe60b",

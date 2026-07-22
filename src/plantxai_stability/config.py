@@ -85,6 +85,15 @@ def _validate_protocol(values: dict[str, Any]) -> None:
             raise ValueError(
                 "governance.evidence_records.checkpoint_selection is required for G1 PASS"
             )
+    if governance.get("G2_TEST_EVALUATION_READY") == "pass":
+        if governance.get("G1_CHECKPOINT_SELECTION") != "pass":
+            raise ValueError("A passing G2 gate requires G1 PASS")
+        if governance.get("test_evaluation_blockers"):
+            raise ValueError("A passing G2 gate cannot retain test-evaluation blockers")
+        if not evidence_records.get("test_evaluation"):
+            raise ValueError(
+                "governance.evidence_records.test_evaluation is required for G2 PASS"
+            )
     if values["frozen"] != (values["status"] == "frozen"):
         raise ValueError("status=frozen and frozen=true must be declared together")
     if values["frozen"] and not values.get("frozen_at"):
@@ -105,6 +114,13 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         or governance.get("G2_TEST_EVALUATION_READY") != "pass"
     ):
         raise ValueError("Official test evaluation requires training, G1 and G2 approval")
+    if governance.get("official_experiment_allowed") != governance.get(
+        "official_test_evaluation_allowed"
+    ):
+        raise ValueError(
+            "official_experiment_allowed and official_test_evaluation_allowed "
+            "must change together"
+        )
     xai = values["xai"]
     if not xai.get("target_layer_decision_record"):
         raise ValueError("xai.target_layer_decision_record is required")

@@ -13,13 +13,12 @@ from dataclasses import asdict
 from pathlib import Path
 
 from plantxai_stability.config import load_protocol
-from plantxai_stability.data.freeze import require_frozen_artifacts
 from plantxai_stability.data.loader import load_verified_record, preprocess_for_model
-from plantxai_stability.data.manifest import read_manifest_csv
 from plantxai_stability.inference import infer_one
 from plantxai_stability.models import ModelWrapper
-from plantxai_stability.provenance import RunContext, sha256_bytes, sha256_file
+from plantxai_stability.provenance import RunContext, sha256_bytes
 from plantxai_stability.statistics import heatmap_metrics
+from plantxai_stability.test_authorization import authorize_official_test_run
 from plantxai_stability.training import load_checkpoint
 from plantxai_stability.transformations import TransformationPipeline, scenario_grid
 from plantxai_stability.xai import CAMGenerator, forward_align_heatmap
@@ -45,39 +44,45 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--image-root", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--checkpoint-decision-record", type=Path, required=True)
+    parser.add_argument("--test-decision-record", type=Path, required=True)
+    parser.add_argument("--g2-readiness-report", type=Path, required=True)
     parser.add_argument("--model-id", choices=["resnet50", "efficientnet_b0"], required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
     resolved = load_protocol(args.protocol)
-    if not resolved.values.get("governance", {}).get(
-        "official_test_evaluation_allowed", False
-    ):
-        raise SystemExit("Joint evaluation requires G2 official-test approval")
-    require_frozen_artifacts(args.manifest)
-    records = [record for record in read_manifest_csv(args.manifest) if record.split == "test"]
-    if not records:
-        raise SystemExit("Manifest has no test records")
+    output = args.output_dir / args.run_id
+    if output.exists():
+        raise SystemExit("Joint output exists; use a new immutable run ID")
+    authorization = authorize_official_test_run(
+        resolved,
+        manifest_path=args.manifest,
+        checkpoint_path=args.checkpoint,
+        model_id=args.model_id,
+        checkpoint_decision_path=args.checkpoint_decision_record,
+        test_decision_path=args.test_decision_record,
+        readiness_report_path=args.g2_readiness_report,
+    )
+    records = authorization["test_records"]
     wrapper = ModelWrapper(args.model_id, len(resolved.values["dataset"]["classes"]), pretrained=False)
-    manifest_sha256 = sha256_file(args.manifest)
     checkpoint_payload = load_checkpoint(
         wrapper,
         args.checkpoint,
         args.device,
-        expected_protocol_hash=resolved.sha256,
-        expected_manifest_sha256=manifest_sha256,
+        expected_protocol_hash=authorization["checkpoint_training_protocol_hash"],
+        expected_manifest_sha256=authorization["manifest_sha256"],
     )
     model = wrapper.model.to(args.device)
     target_layer = wrapper.target_layer()
     context = RunContext.create(resolved.values["protocol_version"], resolved.sha256, resolved.sha256, resolved.seed, args.run_id)
-    output = args.output_dir / args.run_id
     output.mkdir(parents=True, exist_ok=True)
     pipeline = TransformationPipeline(resolved.seed, resolved.values["transformations"]["parameters"])
     scenarios = scenario_grid(resolved.values["transformations"]["parameters"])
     methods = resolved.values["xai"]["methods"]
     xai_policy = resolved.values["xai"]
-    checkpoint_hash = sha256_file(args.checkpoint)
+    checkpoint_hash = authorization["checkpoint_sha256"]
     original_cache = {}
     prediction_rows = []
     joint_rows = []
@@ -122,7 +127,23 @@ def main() -> int:
                 joint_rows.append(_joint_row(args.run_id, args.model_id, record.sample_id, record.leaf_id, scenario.scenario_id, method, original_prediction.predicted_class, True, metrics, mask_hash, ""))
     _write_csv(output / "prediction_results.csv", prediction_rows)
     _write_csv(output / "joint_results.csv", joint_rows)
-    (output / "run_manifest.json").write_text(json.dumps({"context": context.to_dict(), "protocol_hash": resolved.sha256, "manifest": str(args.manifest), "manifest_sha256": sha256_file(args.manifest), "checkpoint": str(args.checkpoint), "checkpoint_sha256": checkpoint_hash, "scenario_count": len(scenarios), "xai_methods": methods, "xai_alignment_policy": {key: xai_policy[key] for key in ("alignment_policy", "valid_region_policy", "validity_threshold", "ssim_window_size", "topk_iou_primary", "topk_iou_sensitivity", "target_class_policy", "prediction_consistency_required", "rotation_prediction_claim_scope")}, "checkpoint_payload": checkpoint_payload}, indent=2, default=str), encoding="utf-8")
+    checkpoint_metadata = {
+        key: checkpoint_payload.get(key)
+        for key in (
+            "format_version",
+            "checkpoint_role",
+            "model_id",
+            "num_classes",
+            "class_names",
+            "validation_macro_f1",
+            "best_epoch",
+            "seed",
+            "protocol_hash",
+            "manifest_sha256",
+            "test_split_accessed",
+        )
+    }
+    (output / "run_manifest.json").write_text(json.dumps({"context": context.to_dict(), "campaign_id": authorization["campaign_id"], "authorization_decision_id": authorization["authorization_decision_id"], "governance_protocol_hash": resolved.sha256, "checkpoint_training_protocol_hash": authorization["checkpoint_training_protocol_hash"], "manifest": str(args.manifest), "manifest_sha256": authorization["manifest_sha256"], "freeze_record_sha256": authorization["freeze_record_sha256"], "checkpoint": str(args.checkpoint), "checkpoint_sha256": checkpoint_hash, "test_decision_record_sha256": authorization["test_decision_record_sha256"], "g2_readiness_report_sha256": authorization["g2_readiness_report_sha256"], "official_test_identity": authorization["test_identity"], "scenario_count": len(scenarios), "xai_methods": methods, "xai_alignment_policy": {key: xai_policy[key] for key in ("alignment_policy", "valid_region_policy", "validity_threshold", "ssim_window_size", "topk_iou_primary", "topk_iou_sensitivity", "target_class_policy", "prediction_consistency_required", "rotation_prediction_claim_scope")}, "checkpoint_metadata": checkpoint_metadata}, indent=2, default=str), encoding="utf-8")
     print(json.dumps({"run_id": args.run_id, "prediction_rows": len(prediction_rows), "joint_rows": len(joint_rows), "scenario_count": len(scenarios)}, indent=2))
     return 0
 
