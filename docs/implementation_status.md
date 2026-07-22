@@ -8,6 +8,11 @@ Date: 2026-07-22
 - Stable sample identity and canonical RGB hashing.
 - Hugging Face adapter for `mohanty/PlantVillage` (`color`) with schema
   inspection, explicit `leaf_id` checks and optional manifest materialisation.
+- Source-compatible filename reconstruction with explicit
+  `filename_reconstructed` provenance, comparison against `leaf-map.json`, and
+  ambiguity/collision/class-conflict/train-test-overlap gates.
+- Immutable leaf-identity evidence (`leaf_identity_resolution_report.parquet`
+  and its hashed JSON summary) plus a manifest governance check.
 - Image-level audit artifacts (`dataset_receipt.json`, `image_audit.parquet`),
   duplicate/label/leaf conflict detection and immutable freeze artifacts.
 - Deterministic class-stratified leaf split construction and DataLoader hash,
@@ -27,7 +32,7 @@ Date: 2026-07-22
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (16 tests)
+pytest                          PASS (20 tests)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -46,10 +51,16 @@ G0B_PROTOCOL_FREEZE_READY: BLOCKED
 official_experiment_allowed: false
 ```
 
-No dataset count, model accuracy, confidence interval, p-value or XAI stability result has been produced. The following evidence is still required before a scientific run:
+The pinned metadata audit covers all 8,398 selected samples, but it found five
+reconstructed leaf identities shared by upstream train and test (10 affected
+samples). `DR-LEAF-001` is therefore rejected and manifest creation remains
+blocked. No model accuracy, confidence interval, p-value or XAI stability
+result has been produced. The following evidence is still required before a
+scientific run:
 
 1. Audit the pinned dataset revision (`9e97599868962bd0079b8db4b7f1efa9185fa1e7`).
-2. Verify a reliable `leaf_id` field.
+2. Resolve the five upstream train/test leaf overlaps through a reviewed
+   protocol change or stronger identity evidence.
 3. Build and approve the canonical manifest.
 4. Freeze leaf-safe train/validation/test splits.
 5. Pilot and approve transformation severity.

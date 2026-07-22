@@ -22,6 +22,7 @@ from plantxai_stability.data.huggingface import (
     split_counts,
 )
 from plantxai_stability.data.manifest import write_manifest
+from plantxai_stability.provenance import sha256_file
 
 
 def main() -> int:
@@ -44,9 +45,16 @@ def main() -> int:
         type=Path,
         default=Path("configs/protocol/v0.9/decision_records/DR-CLASS-001.yaml"),
     )
+    parser.add_argument(
+        "--leaf-identity-dr",
+        type=Path,
+        default=Path("configs/protocol/v0.9/decision_records/DR-LEAF-001.yaml"),
+    )
+    parser.add_argument("--leaf-identity-summary", type=Path)
     args = parser.parse_args()
 
     decision_record = None
+    leaf_decision_record = None
     if args.manifest:
         if not args.classes:
             raise SystemExit("Official manifest requires an explicit --classes list")
@@ -68,6 +76,32 @@ def main() -> int:
             )
         if tuple(args.classes) != tuple(decision_record.get("selected_classes", [])):
             raise SystemExit("Requested classes do not match the approved Decision Record")
+        if args.leaf_identity_summary is None:
+            raise SystemExit("Official manifest requires --leaf-identity-summary")
+        try:
+            leaf_decision_record = yaml.safe_load(
+                args.leaf_identity_dr.read_text(encoding="utf-8")
+            )
+            leaf_summary = json.loads(args.leaf_identity_summary.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError, yaml.YAMLError) as exc:
+            raise SystemExit(f"Cannot load leaf identity governance evidence: {exc}") from exc
+        if leaf_decision_record.get("status") != "approved":
+            raise SystemExit("Official manifest blocked: leaf identity Decision Record is not approved")
+        if leaf_decision_record.get("dataset_revision") != args.revision:
+            raise SystemExit("Leaf identity Decision Record revision mismatch")
+        if tuple(leaf_decision_record.get("selected_classes", [])) != tuple(args.classes):
+            raise SystemExit("Leaf identity Decision Record class scope mismatch")
+        if not leaf_summary.get("passed", False):
+            raise SystemExit("Official manifest blocked: leaf identity audit did not pass")
+        evidence = leaf_decision_record.get("evidence", {})
+        if evidence.get("resolution_report_sha256") != leaf_summary.get("report_sha256"):
+            raise SystemExit("Leaf identity report hash does not match its Decision Record")
+        if evidence.get("resolution_summary_sha256") != sha256_file(args.leaf_identity_summary):
+            raise SystemExit("Leaf identity summary hash does not match its Decision Record")
+        if evidence.get("dataset_receipt_sha256") != leaf_summary.get(
+            "dataset_receipt_sha256"
+        ):
+            raise SystemExit("Dataset receipt hash does not match the leaf Decision Record")
 
     dataset = load_hf_dataset(
         args.dataset_id,
@@ -75,6 +109,7 @@ def main() -> int:
         args.revision,
         selected_classes=args.classes or None,
         prepare_images=args.manifest,
+        allow_filename_reconstruction=args.manifest,
         cache_dir=args.cache_dir,
         token=os.getenv("HF_TOKEN"),
     )

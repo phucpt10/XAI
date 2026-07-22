@@ -49,20 +49,34 @@ def _source_identity(filename: str) -> str:
     identity = identity.split("copy")[0]
     for extension in (".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG"):
         identity = identity.replace(extension, "")
-    return identity.strip().lower()
+    return identity.strip()
 
 
-def _leaf_id(filename: str, class_name: str, leaf_map: dict[str, Any]) -> str:
-    suggestions = leaf_map.get(_source_identity(filename), [])
+def _leaf_resolution(filename: str, class_name: str, leaf_map: dict[str, Any]) -> dict[str, Any]:
+    source_identity = _source_identity(filename)
+    suggestions = leaf_map.get(source_identity.lower(), [])
     if isinstance(suggestions, str):
         suggestions = [suggestions]
     if len(suggestions) == 1:
-        return str(suggestions[0])
-    matching = [str(item) for item in suggestions if class_name in str(item)]
-    if len(matching) == 1:
-        return matching[0]
-    # Fail closed later: no filename-derived fallback is accepted as leaf evidence.
-    return ""
+        leaf_id = str(suggestions[0])
+        status = "unique_leaf_map_match"
+    else:
+        matching = [str(item) for item in suggestions if class_name in str(item)]
+        if len(matching) == 1:
+            leaf_id = matching[0]
+            status = "class_disambiguated_leaf_map_match"
+        else:
+            leaf_id = ""
+            status = "missing_leaf_map_match" if not suggestions else "ambiguous_leaf_map_match"
+    return {
+        "leaf_id": leaf_id,
+        "mapped_leaf_id": leaf_id,
+        "leaf_id_source": "leaf_map" if leaf_id else "unresolved",
+        "leaf_map_status": status,
+        "leaf_map_suggestions": tuple(str(item) for item in suggestions),
+        "source_leaf_identity": source_identity,
+        "reconstructed_leaf_id": f"fallback_{source_identity}" if source_identity else "",
+    }
 
 
 def _read_split(path: Path) -> list[str]:
@@ -99,6 +113,7 @@ def load_pinned_plantvillage(
     revision: str,
     selected_classes: Iterable[str] | None = None,
     prepare_images: bool = False,
+    allow_filename_reconstruction: bool = False,
     cache_dir: str | Path | None = None,
     token: str | None = None,
 ) -> PinnedPlantVillageDataset:
@@ -165,6 +180,10 @@ def load_pinned_plantvillage(
             filename = parts[-1]
             crop_disease = class_name.split("___", maxsplit=1)
             selected_paths.add(normalized)
+            leaf_resolution = _leaf_resolution(filename, class_name, leaf_map)
+            if allow_filename_reconstruction and not leaf_resolution["leaf_id"]:
+                leaf_resolution["leaf_id"] = leaf_resolution["reconstructed_leaf_id"]
+                leaf_resolution["leaf_id_source"] = "filename_reconstructed"
             rows_by_split[split].append(
                 {
                     "image": {"path": normalized, "bytes": None},
@@ -172,7 +191,7 @@ def load_pinned_plantvillage(
                     "label": class_name,
                     "crop": crop_disease[0],
                     "disease": crop_disease[1] if len(crop_disease) == 2 else "unknown",
-                    "leaf_id": _leaf_id(filename, class_name, leaf_map),
+                    **leaf_resolution,
                     "_source_row_index": source_row_index,
                 }
             )
@@ -216,4 +235,3 @@ def load_pinned_plantvillage(
         fingerprint = hashlib.sha256(fingerprint_payload).hexdigest()
         dataset[split] = PinnedSplit(rows, all_classes, fingerprint)
     return dataset
-

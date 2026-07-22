@@ -23,7 +23,7 @@ The official runner must remain blocked until G0B is approved. Use a separate
 non-official draft training run only for pipeline debugging, and label its
 outputs as `draft_smoke`.
 
-## 3. Inspect the Hugging Face source and build the manifest
+## 3. Inspect the Hugging Face source and audit leaf identity
 
 The configured source is `mohanty/PlantVillage`, configuration `color`. The
 dataset card documents `train`/`test`, `image`, `label`, `leaf_id`, `crop` and
@@ -37,7 +37,57 @@ dataset card documents `train`/`test`, `image`, `label`, `leaf_id`, `crop` and
   --output-dir /content/plantxai-data-inspection
 ```
 
-For the protocol's five tomato classes, materialise the canonical manifest:
+Inspect only the protocol's five tomato classes and retain its receipt:
+
+```python
+!python scripts/inspect_hf_dataset.py \
+  --dataset-id mohanty/PlantVillage \
+  --configuration color \
+  --revision 9e97599868962bd0079b8db4b7f1efa9185fa1e7 \
+  --classes Tomato___healthy Tomato___Bacterial_spot Tomato___Early_blight Tomato___Late_blight Tomato___Septoria_leaf_spot \
+  --output-dir /content/plantxai-tomato-inspection
+```
+
+Then apply the pinned source loader's filename rule and run all leaf-identity
+gates. The output directory is immutable, so use a new versioned path for every
+rerun:
+
+```python
+!python scripts/audit_leaf_identity.py \
+  --dataset-id mohanty/PlantVillage \
+  --configuration color \
+  --revision 9e97599868962bd0079b8db4b7f1efa9185fa1e7 \
+  --classes Tomato___healthy Tomato___Bacterial_spot Tomato___Early_blight Tomato___Late_blight Tomato___Septoria_leaf_spot \
+  --dataset-receipt /content/plantxai-tomato-inspection/dataset_receipt.json \
+  --output-dir /content/plantxai-leaf-audit-v1
+```
+
+For this pinned revision the command is expected to exit nonzero: coverage is
+100%, but five reconstructed leaf identities cross train/test. Inspect the ten
+affected records without modifying them:
+
+```python
+import pandas as pd
+
+report = pd.read_parquet(
+    "/content/plantxai-leaf-audit-v1/leaf_identity_resolution_report.parquet"
+)
+overlap = report[report["reason_code"].str.contains("LEAF_SPLIT_OVERLAP", na=False)]
+display(overlap[[
+    "source_split", "source_row_index", "image_path", "class_name",
+    "resolved_leaf_id", "leaf_id_source", "reason_code",
+]].sort_values(["resolved_leaf_id", "source_split"]))
+```
+
+`DR-LEAF-001.yaml` records the failed decision. Do not approve it or build an
+official manifest until a replacement Decision Record resolves the overlap and
+the rerun passes every acceptance criterion.
+
+## 4. Build and freeze the manifest after approval
+
+The following command is intentionally blocked today. It documents the exact
+inputs required after both Decision Records are approved and their hashes match
+the evidence:
 
 The repository ships `DR-CLASS-001.yaml` in `draft` status. A reviewer must
 complete its audit identity and approval fields, then set `status: approved`
@@ -50,15 +100,17 @@ before the `--manifest` command is allowed to create an official manifest.
   --revision 9e97599868962bd0079b8db4b7f1efa9185fa1e7 \
   --classes Tomato___healthy Tomato___Bacterial_spot Tomato___Early_blight Tomato___Late_blight Tomato___Septoria_leaf_spot \
   --manifest \
-  --output-dir /content/plantxai-data-inspection
+  --leaf-identity-summary /content/plantxai-leaf-audit-v2/leaf_identity_resolution_summary.json \
+  --output-dir /content/plantxai-manifest-v1
 ```
 
 The `--manifest` option also exports audited RGB PNGs under
-`/content/plantxai-data-inspection/images`, so the existing filesystem-backed
+`/content/plantxai-manifest-v1/images`, so the existing filesystem-backed
 PyTorch loader can consume exactly the hashed pixels. The manifest preserves
 the upstream `train`/`test` assignment and records canonical RGB hashes,
-dimensions, class labels and `leaf_id`. Never fabricate `leaf_id`; an absent or
-empty group key is a hard audit failure.
+dimensions, class labels and `leaf_id`. A source-derived reconstruction is
+allowed only when its Decision Record and evidence gate are approved; an
+unresolved group key is always a hard audit failure.
 
 Prepare a metadata CSV with `relative_path`, `leaf_id`, `class_name`,
 `class_id` and `source_split`, then run:
@@ -71,7 +123,8 @@ Prepare a metadata CSV with `relative_path`, `leaf_id`, `class_name`,
   --audit-out /content/dataset_audit.json
 ```
 
-Do not create a synthetic `leaf_id` when the source does not provide one.
+Do not replace missing identity with a row index, traversal order or arbitrary
+synthetic `leaf_id`.
 
 After the class-selection Decision Record is approved, freeze the manifest and
 create the immutable split evidence:
@@ -87,7 +140,7 @@ create the immutable split evidence:
 
 Training and evaluation must use the frozen split CSVs, never a directory scan.
 
-## 4. Train and preserve checkpoints
+## 5. Train and preserve checkpoints
 
 The training API in `plantxai_stability.training` selects checkpoints only by
 validation macro-F1 and writes both the checkpoint hash and training history.
@@ -127,7 +180,7 @@ frozen protocol, a validated checkpoint and the XAI dependencies.
 Keep checkpoints and run outputs outside the source tree or in Git LFS/object
 storage; do not commit model weights to the normal Git history.
 
-## 5. Export results
+## 6. Export results
 
 Every run must have a unique `run_id` and write resolved configuration,
 predictions, heatmaps, metrics, statistics, tables, figures, logs and a

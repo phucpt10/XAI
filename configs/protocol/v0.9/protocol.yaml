@@ -13,6 +13,7 @@ governance:
     - dataset_receipt_not_reviewed
     - image_audit_not_passed
     - class_selection_decision_record_not_approved
+    - leaf_identity_resolution_not_approved
     - audited_manifest_not_built
     - immutable_split_artifacts_not_written
     - transformation_severity_pilot_not_executed

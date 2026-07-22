@@ -54,6 +54,7 @@ def load_hf_dataset(
     *,
     selected_classes: Iterable[str] | None = None,
     prepare_images: bool = False,
+    allow_filename_reconstruction: bool = False,
     cache_dir: str | Path | None = None,
     token: str | None = None,
 ) -> Any:
@@ -67,6 +68,7 @@ def load_hf_dataset(
             revision=revision,
             selected_classes=selected_classes,
             prepare_images=prepare_images,
+            allow_filename_reconstruction=allow_filename_reconstruction,
             cache_dir=cache_dir,
             token=token,
         )
