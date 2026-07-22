@@ -4,13 +4,35 @@
   "title": "PlantXAI-Stability protocol draft",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "protocol_version", "status", "frozen", "seed", "dataset", "models", "transformations", "xai", "statistics"],
+  "required": ["schema_version", "protocol_version", "status", "frozen", "seed", "governance", "dataset", "models", "training", "transformations", "xai", "statistics"],
   "properties": {
     "schema_version": {"type": "string"},
     "protocol_version": {"type": "string"},
     "status": {"enum": ["draft", "frozen", "retired"]},
     "frozen": {"type": "boolean"},
+    "frozen_at": {"type": ["string", "null"]},
+    "protocol_hash": {"type": ["string", "null"]},
     "seed": {"type": "integer", "minimum": 0},
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["G0A_BOOTSTRAP_READY", "G0B_PROTOCOL_FREEZE_READY", "blockers", "evidence_records", "official_experiment_allowed"],
+      "properties": {
+        "G0A_BOOTSTRAP_READY": {"enum": ["pass", "blocked"]},
+        "G0B_PROTOCOL_FREEZE_READY": {"enum": ["pass", "blocked"]},
+        "blockers": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "evidence_records": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["runtime_readiness", "xai_target_layers"],
+          "properties": {
+            "runtime_readiness": {"type": "string", "minLength": 1},
+            "xai_target_layers": {"type": "string", "minLength": 1}
+          }
+        },
+        "official_experiment_allowed": {"type": "boolean"}
+      }
+    },
     "dataset": {
       "type": "object",
       "additionalProperties": false,
@@ -33,27 +55,62 @@
             "official_test_action": {"const": "preserve_exactly"},
             "train_test_leaf_overlap_action": {"const": "quarantine_source_train"}
           }
-        }
+        },
+        "image_size": {"type": "array", "prefixItems": [{"type": "integer", "minimum": 1}, {"type": "integer", "minimum": 1}], "items": false},
+        "rgb_range": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}], "items": false},
+        "imagenet_mean": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+        "imagenet_std": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number", "exclusiveMinimum": 0}}
       }
     },
     "models": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "training": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pretrained", "max_epochs", "batch_size", "learning_rate", "optimizer", "weight_decay", "scheduler", "early_stopping_patience", "selection_metric", "mixed_precision"],
+      "properties": {
+        "pretrained": {"type": "boolean"},
+        "max_epochs": {"type": "integer", "minimum": 1},
+        "batch_size": {"type": "integer", "minimum": 1},
+        "learning_rate": {"type": "number", "exclusiveMinimum": 0},
+        "optimizer": {"type": "string"},
+        "weight_decay": {"type": "number", "minimum": 0},
+        "scheduler": {"type": "string"},
+        "early_stopping_patience": {"type": "integer", "minimum": 1},
+        "selection_metric": {"type": "string"},
+        "mixed_precision": {"type": "boolean"}
+      }
+    },
     "transformations": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["names", "severities", "parameters"],
+      "required": ["names", "severities", "materialize_images", "deterministic_per_sample_seed", "record_exact_parameters", "parameters"],
       "properties": {
         "names": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "severities": {"type": "array", "items": {"enum": ["mild", "moderate", "severe"]}},
+        "materialize_images": {"type": "boolean"},
+        "deterministic_per_sample_seed": {"type": "boolean"},
+        "record_exact_parameters": {"type": "boolean"},
         "parameters": {"type": "object"}
       }
     },
     "xai": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["methods", "target_layers"],
+      "required": ["methods", "target_layer_decision_record", "target_layers"],
       "properties": {
         "methods": {"type": "array", "items": {"type": "string"}},
-        "target_layers": {"type": "object"}
+        "target_layer_decision_record": {"type": "string"},
+        "target_layers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resnet50", "efficientnet_b0"],
+          "properties": {
+            "resnet50": {"type": "string", "minLength": 1},
+            "efficientnet_b0": {"type": "string", "minLength": 1}
+          }
+        },
+        "heatmap_epsilon": {"type": "number", "exclusiveMinimum": 0},
+        "constant_heatmap_policy": {"type": "string"}
       }
     },
     "statistics": {
@@ -64,8 +121,12 @@
         "bootstrap_unit": {"const": "leaf_id"},
         "bootstrap_iterations": {"type": "integer", "minimum": 100},
         "confidence_level": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "seed": {"type": "integer", "minimum": 0},
         "test": {"const": "paired_wilcoxon"},
-        "correction": {"const": "holm"}
+        "zero_method": {"type": "string"},
+        "correction": {"const": "holm"},
+        "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+        "effect_size": {"type": "string"}
       }
     }
   }

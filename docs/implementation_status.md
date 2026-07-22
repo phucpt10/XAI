@@ -29,6 +29,12 @@ Date: 2026-07-22
 - Deterministic four-transformation pipeline with twelve scenario labels.
 - Optional ResNet50/EfficientNet-B0 wrappers and validation-only training API.
 - Optional Grad-CAM, Grad-CAM++ and Score-CAM adapter.
+- Approved runtime target layers: ResNet50 `layer4[-1]` with activation shape
+  `1x2048x7x7`, and EfficientNet-B0 `features[-1]` with `1x1280x7x7`.
+- Six passing CAM runtime checks across Grad-CAM, Grad-CAM++ and Score-CAM,
+  recorded by `DR-XAI-001` without accessing official test.
+- Passing deterministic DataLoader and two-backbone mixed-precision smoke
+  evidence recorded by `DR-RUNTIME-001`.
 - Colab-ready training, baseline evaluation and single-model joint evaluation scripts.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
@@ -63,18 +69,16 @@ reconstructed leaf identities shared by upstream train and test (10 affected
 samples). `DR-LEAF-001` records the failed raw-source gate. The project owner
 approved `DR-LEAF-002`: preserve all 1,693 official test samples and quarantine
 the five source-train counterparts, leaving 8,393 eligible modeling samples.
-Colab materialization confirmed the first quarantine and found nine remaining
-benign train-only duplicate pairs. `DR-DUP-001` defines the cumulative final
-universe: 8,384 eligible samples, 14 quarantined train samples and all 1,693
-official test samples preserved. Final duplicate adjudication must be
-materialized before freeze. No model accuracy, confidence interval, p-value or
-XAI stability result has been produced.
+Colab completed the cumulative quarantine, yielding 8,384 eligible samples,
+14 quarantined train samples and all 1,693 official test samples preserved.
+Leaf-safe freeze, deterministic loading, both backbone smoke runs and all six
+target-layer/CAM checks pass. `DR-RUNTIME-001` and `DR-XAI-001` bind the
+reported evidence hashes. No model accuracy, confidence interval, p-value or
+official XAI stability result has been produced.
 
-1. Audit the pinned dataset revision (`9e97599868962bd0079b8db4b7f1efa9185fa1e7`).
-2. Materialize the approved quarantine registry and reconcile all 8,398 rows.
-3. Build and approve the 8,393-sample eligible canonical manifest.
-4. Freeze leaf-safe train/validation/test splits.
-5. Pilot and approve transformation severity.
-6. Train/select and hash validation-approved checkpoints.
-7. Runtime-validate target layers and CAM dependencies.
-8. Freeze the protocol through a reviewed governance change.
+Only two protocol blockers remain:
+
+1. Pilot and approve transformation severity without using official test.
+2. Train/select and hash validation-approved checkpoints.
+3. Regenerate the final frozen artifact bundle against the final protocol hash.
+4. Freeze the protocol through a reviewed governance change.

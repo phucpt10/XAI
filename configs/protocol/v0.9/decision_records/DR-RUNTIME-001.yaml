@@ -1,0 +1,56 @@
+decision_id: DR-RUNTIME-001
+title: Dataset, DataLoader and backbone runtime readiness
+status: approved
+decision_type: runtime_readiness_evidence
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+manifest_sha256: 323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894
+dataset_outcome:
+  audited_samples: 8398
+  eligible_samples: 8384
+  quarantined_train_samples: 14
+  train_samples: 5328
+  validation_samples: 1363
+  official_test_samples: 1693
+  leaf_count: 3851
+  sample_overlap_count: 0
+  leaf_overlap_count: 0
+dataloader_outcome:
+  batch_size: 64
+  num_workers: 0
+  seed: 42
+  identity_order_reproducible: true
+  order_sha256:
+    train: da1152de5de3f728b3f0053f1bc62f0142f50a93d702f3c62f7acf151d1d7361
+    validation: eeb763393a092bb9e67fa11197324b0429e8186ae05a5b192993e90fb8b0c460
+    test: 71102b8bd34e66804766e4192251e527658fabd5294a9cd27d7835abf177b33d
+backbone_smoke_outcome:
+  run_type: draft_smoke_non_official
+  device: NVIDIA A100-SXM4-40GB
+  torch_version: 2.11.0+cu128
+  batch_size: 32
+  mixed_precision: true
+  train_batches_per_model: 2
+  validation_batches_per_model: 2
+  test_split_accessed: false
+  resnet50_passed: true
+  efficientnet_b0_passed: true
+evidence:
+  quarantine_summary_sha256: 8081d6ff8bff1d0f4379383561882d4efdbddef3ac426ec58b9986dfa279ef0e
+  quarantine_summary_size_bytes: 2731
+  freeze_record_sha256: 15e7a8a01e7acb63b0b733150b72a8cccb33ddca86929f3ae2c3854d4a41e4bb
+  freeze_record_size_bytes: 1544
+  split_leakage_report_sha256: d60fb04458b3a7f5093cdf494b1380f629a9a83da78a5bd0339978f1f514ee74
+  split_leakage_report_size_bytes: 254
+  dataloader_quality_report_sha256: 61ab4ee1dadee1d9c3e31b4587371d3c0f3534217306c25c6090dcdc9da59e6f
+  dataloader_quality_report_size_bytes: 911
+  resnet50_smoke_report_sha256: cc22eb51a02e99d9cb040a2fb9157bd063b61e232c2adffcf424932f34c4cec6
+  resnet50_smoke_report_size_bytes: 603
+  efficientnet_b0_smoke_report_sha256: 457e2984fcd7a59c856bc51905aa7dd2c753450ceb7eeaa2de35893c50036e30
+  efficientnet_b0_smoke_report_size_bytes: 609
+decision: >-
+  Approve the frozen dataset, deterministic DataLoader and both backbone
+  implementations as runtime-ready. This decision does not approve scientific
+  model checkpoints, performance estimates or official test access.
+approved_by: project_owner
+approval_basis: reported passing immutable evidence from the Colab runtime
+approved_at_utc: 2026-07-22

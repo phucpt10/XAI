@@ -1,0 +1,40 @@
+decision_id: DR-XAI-001
+title: Runtime-validated CAM target layers
+status: approved
+decision_type: xai_target_layer_validation
+models:
+  resnet50:
+    target_layer: layer4[-1]
+    activation_shape: [1, 2048, 7, 7]
+  efficientnet_b0:
+    target_layer: features[-1]
+    activation_shape: [1, 1280, 7, 7]
+xai_methods:
+  - grad_cam
+  - grad_cam_plus_plus
+  - score_cam
+runtime:
+  torch_version: 2.11.0+cu128
+  device: NVIDIA A100-SXM4-40GB
+  seed: 42
+  validation_sample_id: pv_003ca75d5ae42c40
+  validation_sample_split: validation
+  test_split_accessed: false
+  expected_heatmap_shape: [224, 224]
+  result_count: 6
+  all_heatmaps_finite: true
+  all_heatmaps_nonconstant: true
+  all_heatmaps_in_unit_range: true
+evidence:
+  target_layer_cam_runtime_report_sha256: 18a96dc6b9f7ea4df0896d94e7202d6d6e0ba651edd7729962e3ec4a995efc7c
+  target_layer_cam_runtime_report_size_bytes: 3983
+decision: >-
+  Approve layer4[-1] for ResNet50 and features[-1] for EfficientNet-B0 as the
+  declared CAM target layers for Grad-CAM, Grad-CAM++ and Score-CAM.
+limitations: >-
+  The runtime smoke used pretrained feature extractors with newly initialized
+  five-class heads. It validates execution, shape and heatmap quality only; it
+  is not evidence of explanation validity or model performance.
+approved_by: project_owner
+approval_basis: six passing validation-sample CAM runtime results
+approved_at_utc: 2026-07-22

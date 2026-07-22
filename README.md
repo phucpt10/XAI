@@ -28,6 +28,8 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Deterministic rotation, brightness, Gaussian noise and Gaussian blur transformations.
 - Optional PyTorch model wrappers for ResNet50 and EfficientNet-B0.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
+- Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
+  (EfficientNet-B0), pinned by `DR-XAI-001` evidence.
 - Heatmap quality validation, SSIM/Pearson/cosine metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Run provenance and artifact index helpers.
 - Unit, integration and scientific invariant tests.

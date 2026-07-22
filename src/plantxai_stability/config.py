@@ -37,7 +37,20 @@ def load_protocol(path: str | Path) -> ResolvedConfig:
 
 
 def _validate_protocol(values: dict[str, Any]) -> None:
-    required = {"schema_version", "protocol_version", "status", "frozen", "seed", "dataset", "models", "transformations", "xai", "statistics"}
+    required = {
+        "schema_version",
+        "protocol_version",
+        "status",
+        "frozen",
+        "seed",
+        "governance",
+        "dataset",
+        "models",
+        "training",
+        "transformations",
+        "xai",
+        "statistics",
+    }
     missing = required.difference(values)
     if missing:
         raise ValueError(f"Protocol missing required keys: {sorted(missing)}")
@@ -57,8 +70,28 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         raise ValueError("Quarantine policy must preserve the official test exactly")
     if quarantine.get("train_test_leaf_overlap_action") != "quarantine_source_train":
         raise ValueError("Only source-train quarantine is allowed for train/test leaf overlap")
-    if values["frozen"] and values.get("governance", {}).get("G0B_PROTOCOL_FREEZE_READY") != "pass":
+    governance = values["governance"]
+    evidence_records = governance.get("evidence_records", {})
+    if not evidence_records.get("runtime_readiness"):
+        raise ValueError("governance.evidence_records.runtime_readiness is required")
+    if not evidence_records.get("xai_target_layers"):
+        raise ValueError("governance.evidence_records.xai_target_layers is required")
+    if values["frozen"] and governance.get("G0B_PROTOCOL_FREEZE_READY") != "pass":
         raise ValueError("A frozen protocol requires a passing G0B gate")
+    xai = values["xai"]
+    if not xai.get("target_layer_decision_record"):
+        raise ValueError("xai.target_layer_decision_record is required")
+    target_layers = xai.get("target_layers", {})
+    missing_target_layers = set(values["models"]).difference(target_layers)
+    if missing_target_layers:
+        raise ValueError(f"XAI target layers missing for models: {sorted(missing_target_layers)}")
+    if any(
+        not isinstance(target_layers[model_id], str)
+        or not target_layers[model_id].strip()
+        or target_layers[model_id].startswith("PENDING_")
+        for model_id in values["models"]
+    ):
+        raise ValueError("Every model requires a runtime-approved XAI target layer")
     stats = values["statistics"]
     if stats.get("bootstrap_unit") != "leaf_id":
         raise ValueError("statistics.bootstrap_unit must be leaf_id")
