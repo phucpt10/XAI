@@ -357,6 +357,20 @@ Both reports must state `source_split: validation`,
 `selected_macro_f1_reproduced: true`. These are G1 candidate artifacts, not
 official test results. Do not compare or select checkpoints using test data.
 
+The project owner approved both audited checkpoints in `DR-CHECKPOINT-001`.
+Their immutable training protocol remains the G0B hash
+`7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b`;
+the later governance protocol has a different hash. This is an explicit
+lineage transition, not a reason to rewrite checkpoint metadata or bytes.
+When reproducing the audit after G1, add:
+
+```text
+--checkpoint-decision-record configs/protocol/v0.9/decision_records/DR-CHECKPOINT-001.yaml
+```
+
+G1 approval does not authorize the next commands. Official test remains
+blocked until a separate G2 Decision Record and final lineage gate pass.
+
 Baseline test evaluation is a separate step:
 
 ```python

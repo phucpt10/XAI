@@ -2,11 +2,11 @@
 
 PlantXAI-Stability is research software for evaluating prediction robustness and XAI explanation stability under controlled image transformations.
 
-The implementation follows the English specification in `PlantXAI-Stability_Research_Software_Specification_En.docx`. G0B is frozen after the approved dataset, runtime, target-layer and severity evidence; checkpoint selection and official test evaluation remain independently fail-closed.
+The implementation follows the English specification in `PlantXAI-Stability_Research_Software_Specification_En.docx`. G1 is approved after validation-only selection and audit of both declared backbones. Official test evaluation remains independently fail-closed at G2.
 
 ## Current implementation
 
-- Versioned G0B-frozen protocol at `configs/protocol/v0.9/protocol.yaml`.
+- Versioned G1-approved protocol at `configs/protocol/v0.9/protocol.yaml`.
 - JSON schema and fail-closed protocol loader.
 - Immutable data contracts for samples, predictions, transformations and joint records.
 - Canonical RGB hashing and deterministic `sample_id` construction.
@@ -39,6 +39,8 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Validation-only checkpoint audit with exact identity coverage, per-class
   precision/recall/F1, confusion matrices, probability records and immutable
   artifact hashes; official test pixels remain inaccessible before G2.
+- Approved `DR-CHECKPOINT-001` registry for both validation-selected checkpoints,
+  preserving their original G0B training lineage while governance advances.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.
@@ -57,8 +59,8 @@ python -m plantxai_stability.cli smoke configs/protocol/v0.9/protocol.yaml
 ```
 
 Official training additionally requires a frozen dataset record whose protocol
-hash exactly matches the G0B-frozen protocol. Official test evaluation remains
-blocked until validation-selected checkpoints receive G1/G2 approval.
+hash exactly matches its training protocol. Both checkpoints have G1 approval,
+but official test evaluation remains blocked until the separate G2 gate passes.
 
 ## Official-run prerequisites
 
@@ -67,7 +69,7 @@ blocked until validation-selected checkpoints receive G1/G2 approval.
 3. Freeze leaf-safe train/validation/test splits.
 4. Pilot and approve transformation severities.
 5. Freeze the pre-training protocol and rebind the frozen dataset record (G0B).
-6. Select and hash validation-approved model checkpoints (G1).
-7. Approve checkpoints and explicitly unlock official test evaluation (G2).
+6. Select, audit and approve both model checkpoints using validation only (G1; complete).
+7. Reconcile final lineage and explicitly unlock official test evaluation (G2).
 
 No dataset count, accuracy, confidence interval, p-value or stability result is fabricated by this repository.

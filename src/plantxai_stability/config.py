@@ -78,6 +78,13 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         raise ValueError("governance.evidence_records.xai_target_layers is required")
     if not evidence_records.get("transformation_severity"):
         raise ValueError("governance.evidence_records.transformation_severity is required")
+    if governance.get("G1_CHECKPOINT_SELECTION") == "pass":
+        if governance.get("checkpoint_blockers"):
+            raise ValueError("A passing G1 gate cannot retain checkpoint blockers")
+        if not evidence_records.get("checkpoint_selection"):
+            raise ValueError(
+                "governance.evidence_records.checkpoint_selection is required for G1 PASS"
+            )
     if values["frozen"] != (values["status"] == "frozen"):
         raise ValueError("status=frozen and frozen=true must be declared together")
     if values["frozen"] and not values.get("frozen_at"):

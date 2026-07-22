@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import yaml
 
 from plantxai_stability import __version__
 from plantxai_stability.checkpoint_audit import (
@@ -22,6 +23,7 @@ from plantxai_stability.config import load_protocol
 from plantxai_stability.data.freeze import require_frozen_artifacts
 from plantxai_stability.data.loader import PlantDataset, build_torch_dataloader
 from plantxai_stability.data.manifest import read_manifest_csv
+from plantxai_stability.governance import approved_checkpoint_lineage
 from plantxai_stability.models import ModelWrapper
 from plantxai_stability.provenance import sha256_bytes, sha256_file
 from plantxai_stability.training import load_checkpoint
@@ -34,6 +36,7 @@ def main() -> int:
     parser.add_argument("--image-root", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--checkpoint-evidence", type=Path, required=True)
+    parser.add_argument("--checkpoint-decision-record", type=Path)
     parser.add_argument(
         "--model-id", choices=["resnet50", "efficientnet_b0"], required=True
     )
@@ -52,8 +55,6 @@ def main() -> int:
     ):
         raise SystemExit("Validation checkpoint audit requires frozen G0B approval")
     freeze_record = require_frozen_artifacts(args.manifest)
-    if freeze_record.get("protocol_hash") != resolved.sha256:
-        raise SystemExit("Validation audit blocked: freeze record protocol hash mismatch")
     summary_path = args.manifest.parent / "split_summary.json"
     if not summary_path.is_file():
         raise SystemExit("Validation audit blocked: split_summary.json is missing")
@@ -78,12 +79,39 @@ def main() -> int:
     freeze_record_sha256 = sha256_file(
         args.manifest.parent / "freeze_record.json"
     )
+    checkpoint_protocol_hash = resolved.sha256
+    checkpoint_decision_id = None
+    if freeze_record.get("protocol_hash") != resolved.sha256:
+        if args.checkpoint_decision_record is None:
+            raise SystemExit(
+                "Validation audit blocked: post-G1 audit requires the approved "
+                "checkpoint Decision Record"
+            )
+        checkpoint_decision = yaml.safe_load(
+            args.checkpoint_decision_record.read_text(encoding="utf-8")
+        )
+        lineage = approved_checkpoint_lineage(
+            checkpoint_decision,
+            governance,
+            model_id=args.model_id,
+            declared_models=resolved.values["models"],
+            checkpoint_sha256=checkpoint_sha256,
+            manifest_sha256=manifest_sha256,
+            freeze_record_sha256=freeze_record_sha256,
+        )
+        checkpoint_protocol_hash = str(lineage["training_protocol_hash"])
+        checkpoint_decision_id = str(lineage["decision_id"])
+        if freeze_record.get("protocol_hash") != checkpoint_protocol_hash:
+            raise SystemExit(
+                "Validation audit blocked: freeze record does not match approved "
+                "checkpoint training lineage"
+            )
     wrapper = ModelWrapper(args.model_id, class_count, pretrained=False)
     checkpoint_payload = load_checkpoint(
         wrapper,
         args.checkpoint,
         args.device,
-        expected_protocol_hash=resolved.sha256,
+        expected_protocol_hash=checkpoint_protocol_hash,
         expected_manifest_sha256=manifest_sha256,
     )
     training_evidence = json.loads(args.checkpoint_evidence.read_text(encoding="utf-8"))
@@ -91,7 +119,7 @@ def main() -> int:
         training_evidence,
         checkpoint_payload,
         model_id=args.model_id,
-        protocol_hash=resolved.sha256,
+        protocol_hash=checkpoint_protocol_hash,
         manifest_sha256=manifest_sha256,
         checkpoint_sha256=checkpoint_sha256,
         freeze_record_sha256=freeze_record_sha256,
@@ -211,7 +239,9 @@ def main() -> int:
         "source_split": "validation",
         "test_split_accessed": False,
         "model_id": args.model_id,
-        "protocol_hash": resolved.sha256,
+        "protocol_hash": checkpoint_protocol_hash,
+        "governance_protocol_hash": resolved.sha256,
+        "checkpoint_decision_record": checkpoint_decision_id,
         "manifest_sha256": manifest_sha256,
         "freeze_record_sha256": freeze_record_sha256,
         "checkpoint_sha256": checkpoint_sha256,

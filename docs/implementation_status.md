@@ -4,7 +4,7 @@ Date: 2026-07-23
 
 ## Implemented
 
-- Protocol v0.9 frozen at G0B with fail-closed G1/G2 validation.
+- Protocol v0.9 advanced to approved G1 with fail-closed G2 validation.
 - Stable sample identity and canonical RGB hashing.
 - Hugging Face adapter for `mohanty/PlantVillage` (`color`) with schema
   inspection, explicit `leaf_id` checks and optional manifest materialisation.
@@ -40,6 +40,9 @@ Date: 2026-07-23
 - Validation-only G1 checkpoint audit with checkpoint/training/freeze lineage,
   exact sample coverage, per-class metrics, confusion matrices, NLL, Brier
   score, deterministic prediction records and immutable hashes.
+- Approved `DR-CHECKPOINT-001` registry for both predeclared backbones. It binds
+  checkpoint, training evidence, validation prediction and metric artifact
+  hashes while preserving the immutable G0B training-protocol lineage.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
@@ -49,7 +52,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (48 tests; torch integration skipped when unavailable)
+pytest                          PASS (53 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -67,7 +70,7 @@ status: frozen
 frozen: true
 G0A_BOOTSTRAP_READY: PASS
 G0B_PROTOCOL_FREEZE_READY: PASS
-G1_CHECKPOINT_SELECTION: BLOCKED
+G1_CHECKPOINT_SELECTION: PASS
 G2_TEST_EVALUATION_READY: BLOCKED
 official_training_allowed: true
 official_test_evaluation_allowed: false
@@ -83,21 +86,26 @@ Colab completed the cumulative quarantine, yielding 8,384 eligible samples,
 14 quarantined train samples and all 1,693 official test samples preserved.
 Leaf-safe freeze, deterministic loading, both backbone smoke runs and all six
 target-layer/CAM checks pass. `DR-RUNTIME-001` and `DR-XAI-001` bind the
-reported evidence hashes. No model accuracy, confidence interval, p-value or
-official XAI stability result has been produced.
+reported evidence hashes. No official-test accuracy, confidence interval,
+p-value or XAI stability result has been produced.
 
 `DR-SEVERITY-006` binds the approved v6 pilot and four visual-review artifacts.
 Its outcome is `PASS_WITH_DECLARED_OPERATOR_LIMITATION`: severity is ordinal
 only within each transformation; rotation prediction claims are specific to
 the zero-filled operator; CAM stability requires forward alignment and M_T.
-The old frozen dataset record cannot authorize training because its protocol
-hash differs from the final G0B hash.
+The two G1 checkpoints retain the final G0B training hash
+`7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b`.
+`DR-CHECKPOINT-001` is the explicit lineage bridge from that immutable training
+configuration to the later G1 governance state; checkpoint files are not
+rewritten or re-signed. The resulting G1 governance protocol hash is
+`88440f4e740a707e128cb80d0680dca4f38c104388f51d9493b5b1adb76affe9`.
 
 The remaining work is staged as follows:
 
-1. Recreate the frozen data bundle against the final G0B protocol hash.
-2. G1: train both backbones and select/hash checkpoints using validation only.
-3. G2: approve both checkpoint records and only then unlock official test.
+1. Bind the final test-evaluation freeze/governance lineage without changing
+   the selected checkpoint bytes or scientific configuration.
+2. G2: approve the one-time official-test evaluation and explicitly unlock it.
+3. Run baseline and joint prediction/XAI evaluation only after every G2 gate passes.
 
 Severity pilot v1 passed its original numerical gate but failed human visual
 review because brightness and rotation direction, and the Gaussian base-noise

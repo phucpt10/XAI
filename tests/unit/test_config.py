@@ -6,7 +6,7 @@ import yaml
 from plantxai_stability.config import load_protocol
 
 
-def test_protocol_is_frozen_for_g0b_but_test_remains_closed() -> None:
+def test_protocol_is_frozen_for_g1_but_test_remains_closed() -> None:
     path = Path("configs/protocol/v0.9/protocol.yaml")
     config = load_protocol(path)
     assert config.values["protocol_version"] == "v0.9"
@@ -14,13 +14,18 @@ def test_protocol_is_frozen_for_g0b_but_test_remains_closed() -> None:
     assert config.values["frozen"] is True
     assert config.values["governance"]["G0B_PROTOCOL_FREEZE_READY"] == "pass"
     assert config.values["governance"]["blockers"] == []
-    assert config.values["governance"]["G1_CHECKPOINT_SELECTION"] == "blocked"
+    assert config.values["governance"]["G1_CHECKPOINT_SELECTION"] == "pass"
+    assert config.values["governance"]["checkpoint_blockers"] == []
     assert config.values["governance"]["G2_TEST_EVALUATION_READY"] == "blocked"
     assert config.values["governance"]["official_training_allowed"] is True
     assert config.values["governance"]["official_test_evaluation_allowed"] is False
     assert (
         config.values["governance"]["evidence_records"]["transformation_severity"]
         == "DR-SEVERITY-006"
+    )
+    assert (
+        config.values["governance"]["evidence_records"]["checkpoint_selection"]
+        == "DR-CHECKPOINT-001"
     )
     assert config.values["xai"]["target_layers"] == {
         "resnet50": "layer4[-1]",
@@ -66,4 +71,26 @@ def test_passing_g0b_rejects_retained_blockers(tmp_path: Path) -> None:
     candidate.write_text(yaml.safe_dump(values, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ValueError, match="cannot retain G0B blockers"):
+        load_protocol(candidate)
+
+
+def test_passing_g1_requires_checkpoint_evidence(tmp_path: Path) -> None:
+    source = Path("configs/protocol/v0.9/protocol.yaml")
+    values = yaml.safe_load(source.read_text(encoding="utf-8"))
+    del values["governance"]["evidence_records"]["checkpoint_selection"]
+    candidate = tmp_path / "protocol.yaml"
+    candidate.write_text(yaml.safe_dump(values, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="checkpoint_selection is required"):
+        load_protocol(candidate)
+
+
+def test_passing_g1_rejects_checkpoint_blockers(tmp_path: Path) -> None:
+    source = Path("configs/protocol/v0.9/protocol.yaml")
+    values = yaml.safe_load(source.read_text(encoding="utf-8"))
+    values["governance"]["checkpoint_blockers"] = ["stale_checkpoint_blocker"]
+    candidate = tmp_path / "protocol.yaml"
+    candidate.write_text(yaml.safe_dump(values, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cannot retain checkpoint blockers"):
         load_protocol(candidate)
