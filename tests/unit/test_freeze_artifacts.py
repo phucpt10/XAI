@@ -30,11 +30,16 @@ def test_freeze_artifacts_are_hashed_and_immutable(tmp_path: Path):
         protocol_hash="protocol",
         audit_identity="audit",
         class_selection_decision_record="DR-CLASS-001.yaml",
+        quarantine_decision_record="DR-LEAF-002.yaml",
+        quarantine_registry_sha256="registry",
+        quarantine_summary_sha256="summary",
         split_policy="test-preserved",
         seed=42,
     )
     assert "dataset_manifest.parquet" in hashes
-    require_frozen_artifacts(tmp_path / "dataset_manifest.csv")
+    freeze_record = require_frozen_artifacts(tmp_path / "dataset_manifest.csv")
+    assert freeze_record["quarantine_decision_record"] == "DR-LEAF-002.yaml"
+    assert freeze_record["quarantine_registry_sha256"] == "registry"
     with pytest.raises(FileExistsError):
         write_frozen_dataset_artifacts(
             records,
@@ -42,7 +47,9 @@ def test_freeze_artifacts_are_hashed_and_immutable(tmp_path: Path):
             protocol_hash="protocol",
             audit_identity="audit",
             class_selection_decision_record="DR-CLASS-001.yaml",
+            quarantine_decision_record="DR-LEAF-002.yaml",
+            quarantine_registry_sha256="registry",
+            quarantine_summary_sha256="summary",
             split_policy="test-preserved",
             seed=42,
         )
-

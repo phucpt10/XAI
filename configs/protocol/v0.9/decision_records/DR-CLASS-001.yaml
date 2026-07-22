@@ -1,6 +1,6 @@
 decision_id: DR-CLASS-001
 title: Five-class tomato scope for PlantXAI-Stability
-status: draft
+status: approved
 selected_classes:
   - Tomato___healthy
   - Tomato___Bacterial_spot
@@ -12,9 +12,12 @@ rationale: >-
   research questions and keep the class vocabulary fixed before model training.
 dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
 selection_used_official_test_performance: false
-audit_identity: pending
-approved_by: pending
-approved_at_utc: pending
+audit_identity: 915d63d4c8b66b7d8f0b3121eac5bfa3b68c0ebc4ce237c003d5f3818c97062e
+approved_by: project_owner
+approval_basis: >-
+  Explicit approval to retain the five-class Tomato scope while adopting the
+  governed quarantine policy in the PlantXAI-Stability Codex task.
+approved_at_utc: 2026-07-22
 notes: >-
-  This record must be reviewed and set to approved before an official manifest
-  can be frozen. A draft record is not evidence of approval.
+  Approval is restricted to the pinned revision and does not use official test
+  performance. Any class-list or revision change requires a new Decision Record.

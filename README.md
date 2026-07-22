@@ -14,6 +14,9 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
   inspection, `leaf_id` validation and manifest materialisation.
 - Dataset receipt, image-level audit, duplicate/conflict detection and immutable
   manifest/split freeze artifacts.
+- Governed quarantine adjudication that preserves every official test sample,
+  excludes only approved source-train conflicts, reconciles every audited row,
+  and carries registry hashes into the freeze record.
 - Deterministic leaf-stratified splitting and DataLoader re-validation of image
   shape, RGB hash, pixel range and identity metadata.
 - Leaf-safe split validation and train/validation grouping.

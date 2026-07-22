@@ -50,6 +50,13 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         raise ValueError("dataset.group_key must be leaf_id")
     if not dataset.get("classes"):
         raise ValueError("dataset.classes must not be empty")
+    quarantine = dataset.get("quarantine_policy", {})
+    if quarantine.get("enabled") is not True:
+        raise ValueError("dataset.quarantine_policy.enabled must be true")
+    if quarantine.get("official_test_action") != "preserve_exactly":
+        raise ValueError("Quarantine policy must preserve the official test exactly")
+    if quarantine.get("train_test_leaf_overlap_action") != "quarantine_source_train":
+        raise ValueError("Only source-train quarantine is allowed for train/test leaf overlap")
     if values["frozen"] and values.get("governance", {}).get("G0B_PROTOCOL_FREEZE_READY") != "pass":
         raise ValueError("A frozen protocol requires a passing G0B gate")
     stats = values["statistics"]

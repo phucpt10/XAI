@@ -45,7 +45,7 @@ Inspect only the protocol's five tomato classes and retain its receipt:
   --configuration color \
   --revision 9e97599868962bd0079b8db4b7f1efa9185fa1e7 \
   --classes Tomato___healthy Tomato___Bacterial_spot Tomato___Early_blight Tomato___Late_blight Tomato___Septoria_leaf_spot \
-  --output-dir /content/plantxai-tomato-inspection
+  --output-dir /content/plantxai-tomato-inspection-v1
 ```
 
 Then apply the pinned source loader's filename rule and run all leaf-identity
@@ -58,7 +58,7 @@ rerun:
   --configuration color \
   --revision 9e97599868962bd0079b8db4b7f1efa9185fa1e7 \
   --classes Tomato___healthy Tomato___Bacterial_spot Tomato___Early_blight Tomato___Late_blight Tomato___Septoria_leaf_spot \
-  --dataset-receipt /content/plantxai-tomato-inspection/dataset_receipt.json \
+  --dataset-receipt /content/plantxai-tomato-inspection-v1/dataset_receipt.json \
   --output-dir /content/plantxai-leaf-audit-v1
 ```
 
@@ -79,19 +79,29 @@ display(overlap[[
 ]].sort_values(["resolved_leaf_id", "source_split"]))
 ```
 
-`DR-LEAF-001.yaml` records the failed decision. Do not approve it or build an
-official manifest until a replacement Decision Record resolves the overlap and
-the rerun passes every acceptance criterion.
+`DR-LEAF-001.yaml` permanently records the failed raw-source decision.
+`DR-LEAF-002.yaml` approves preserving every official test sample and
+quarantining exactly the five source-train counterparts. Materialize that
+decision without decoding pixels:
 
-## 4. Build and freeze the manifest after approval
+```python
+!python scripts/adjudicate_quarantine.py \
+  --leaf-report /content/plantxai-leaf-audit-v1/leaf_identity_resolution_report.parquet \
+  --leaf-summary /content/plantxai-leaf-audit-v1/leaf_identity_resolution_summary.json \
+  --dataset-receipt /content/plantxai-tomato-inspection-v1/dataset_receipt.json \
+  --decision-record configs/protocol/v0.9/decision_records/DR-LEAF-002.yaml \
+  --output-dir /content/plantxai-quarantine-v1
+```
 
-The following command is intentionally blocked today. It documents the exact
-inputs required after both Decision Records are approved and their hashes match
-the evidence:
+This gate must report 10 overlap members, 5 quarantined train rows, 1,693
+preserved official test rows and `passed: true`.
 
-The repository ships `DR-CLASS-001.yaml` in `draft` status. A reviewer must
-complete its audit identity and approval fields, then set `status: approved`
-before the `--manifest` command is allowed to create an official manifest.
+## 4. Build the quarantined modeling manifest
+
+Both class scope and quarantine policy are approved for the exact evidence
+hashes recorded in their Decision Records. Decode every image, retain all rows
+in the lineage manifest, and exclude only the five approved train rows from the
+modeling manifest:
 
 ```python
 !python scripts/inspect_hf_dataset.py \
@@ -100,7 +110,13 @@ before the `--manifest` command is allowed to create an official manifest.
   --revision 9e97599868962bd0079b8db4b7f1efa9185fa1e7 \
   --classes Tomato___healthy Tomato___Bacterial_spot Tomato___Early_blight Tomato___Late_blight Tomato___Septoria_leaf_spot \
   --manifest \
-  --leaf-identity-summary /content/plantxai-leaf-audit-v2/leaf_identity_resolution_summary.json \
+  --class-selection-dr configs/protocol/v0.9/decision_records/DR-CLASS-001.yaml \
+  --leaf-identity-dr configs/protocol/v0.9/decision_records/DR-LEAF-002.yaml \
+  --leaf-identity-report /content/plantxai-leaf-audit-v1/leaf_identity_resolution_report.parquet \
+  --leaf-identity-summary /content/plantxai-leaf-audit-v1/leaf_identity_resolution_summary.json \
+  --governance-dataset-receipt /content/plantxai-tomato-inspection-v1/dataset_receipt.json \
+  --quarantine-adjudication-summary /content/plantxai-quarantine-v1/quarantine_adjudication_summary.json \
+  --quarantine-decision-registry /content/plantxai-quarantine-v1/quarantine_decision_registry.parquet \
   --output-dir /content/plantxai-manifest-v1
 ```
 
@@ -108,33 +124,27 @@ The `--manifest` option also exports audited RGB PNGs under
 `/content/plantxai-manifest-v1/images`, so the existing filesystem-backed
 PyTorch loader can consume exactly the hashed pixels. The manifest preserves
 the upstream `train`/`test` assignment and records canonical RGB hashes,
-dimensions, class labels and `leaf_id`. A source-derived reconstruction is
+dimensions, class labels and `leaf_id`. It also writes the 8,398-row
+`dataset_lineage_manifest.parquet`, five-row `quarantine_registry.parquet` and
+8,393-row eligible `manifest.csv`. A source-derived reconstruction is
 allowed only when its Decision Record and evidence gate are approved; an
 unresolved group key is always a hard audit failure.
-
-Prepare a metadata CSV with `relative_path`, `leaf_id`, `class_name`,
-`class_id` and `source_split`, then run:
-
-```python
-!python scripts/inspect_dataset.py \
-  --root /content/PlantXAI-data \
-  --metadata-csv /content/metadata.csv \
-  --manifest-out /content/manifest.csv \
-  --audit-out /content/dataset_audit.json
-```
 
 Do not replace missing identity with a row index, traversal order or arbitrary
 synthetic `leaf_id`.
 
-After the class-selection Decision Record is approved, freeze the manifest and
-create the immutable split evidence:
+After the manifest quarantine and eligible image audit both pass, freeze the
+manifest and create immutable split evidence:
 
 ```python
 !python scripts/freeze_dataset.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
-  --manifest /content/plantxai-frozen-data/dataset_manifest.csv \
+  --manifest /content/plantxai-manifest-v1/manifest.csv \
   --class-selection-dr configs/protocol/v0.9/decision_records/DR-CLASS-001.yaml \
-  --audit-identity /content/plantxai-data-inspection/dataset_receipt.json \
+  --quarantine-dr configs/protocol/v0.9/decision_records/DR-LEAF-002.yaml \
+  --quarantine-registry /content/plantxai-manifest-v1/quarantine_registry.parquet \
+  --quarantine-summary /content/plantxai-manifest-v1/quarantine_summary.json \
+  --audit-identity /content/plantxai-tomato-inspection-v1/dataset_receipt.json \
   --output-dir /content/plantxai-frozen-data
 ```
 
@@ -150,7 +160,7 @@ For a non-official debugging run while G0B is blocked:
 !python scripts/train_colab.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-data/dataset_manifest.csv \
-  --image-root /content/plantxai-data-inspection \
+  --image-root /content/plantxai-manifest-v1 \
   --model-id resnet50 \
   --output-dir /content/plantxai-runs/draft_smoke/resnet50 \
   --allow-draft-training \
@@ -167,7 +177,7 @@ Baseline test evaluation is a separate step:
 !python scripts/evaluate_baseline.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-data/dataset_manifest.csv \
-  --image-root /content/plantxai-data-inspection \
+  --image-root /content/plantxai-manifest-v1 \
   --model-id resnet50 \
   --checkpoint /content/plantxai-runs/resnet50/resnet50_best.pt \
   --output-dir /content/plantxai-runs/resnet50/baseline \

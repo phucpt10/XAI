@@ -14,7 +14,7 @@
     "dataset": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source", "configuration", "revision", "classes", "group_key", "official_test_policy"],
+      "required": ["source", "configuration", "revision", "classes", "group_key", "official_test_policy", "quarantine_policy"],
       "properties": {
         "source": {"type": "string"},
         "loader": {"enum": ["filesystem_csv", "huggingface_datasets"]},
@@ -22,7 +22,18 @@
         "revision": {"type": "string", "minLength": 1},
         "classes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "group_key": {"const": "leaf_id"},
-        "official_test_policy": {"enum": ["preserve", "pending"]}
+        "official_test_policy": {"enum": ["preserve", "pending"]},
+        "quarantine_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "decision_record", "official_test_action", "train_test_leaf_overlap_action"],
+          "properties": {
+            "enabled": {"const": true},
+            "decision_record": {"type": "string"},
+            "official_test_action": {"const": "preserve_exactly"},
+            "train_test_leaf_overlap_action": {"const": "quarantine_source_train"}
+          }
+        }
       }
     },
     "models": {"type": "array", "minItems": 1, "items": {"type": "string"}},

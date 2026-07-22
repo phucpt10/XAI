@@ -1,0 +1,64 @@
+decision_id: DR-LEAF-002
+title: Preserve official test and quarantine source-train leaf overlaps
+status: approved
+decision_type: quarantine_adjudication
+supersedes: DR-LEAF-001
+dataset_id: mohanty/PlantVillage
+dataset_configuration: color
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+selected_classes:
+  - Tomato___healthy
+  - Tomato___Bacterial_spot
+  - Tomato___Early_blight
+  - Tomato___Late_blight
+  - Tomato___Septoria_leaf_spot
+policy:
+  name: preserve_official_test_and_quarantine_overlapping_train_samples
+  official_test_action: preserve_exactly
+  overlapping_source_train_action: quarantine
+  quarantine_reason_code: TRAIN_SAMPLE_QUARANTINED_TEST_LEAF_OVERLAP
+  silent_drop_allowed: false
+  performance_based_exclusion_allowed: false
+approved_overlap_leaf_ids:
+  - fallback_GHLB2 Leaf 8999
+  - fallback_GHLB_PS Leaf 23.7 Day 13
+  - fallback_GHLB_PS Leaf 24 Day 16
+  - fallback_GH_HL Leaf 220
+  - fallback_GH_HL Leaf 466.1
+expected_counts:
+  audited_samples: 8398
+  source_train_samples: 6705
+  official_test_samples: 1693
+  overlap_leaves: 5
+  overlap_samples: 10
+  quarantined_source_train_samples: 5
+  eligible_source_train_samples: 6700
+  eligible_modeling_samples: 8393
+acceptance_criteria:
+  preserve_every_official_test_sample: true
+  quarantine_only_source_train_samples: true
+  eligible_leaf_split_overlap_count: 0
+  sample_reconciliation_required: true
+  output_artifacts_immutable: true
+evidence:
+  dataset_receipt_sha256: 915d63d4c8b66b7d8f0b3121eac5bfa3b68c0ebc4ce237c003d5f3818c97062e
+  leaf_identity_resolution_report_sha256: 8bb56a2c1e247c411be32f22b014d2518ec3a2b6193330aacfd5f6cb2635f59d
+  leaf_identity_resolution_summary_sha256: 8b5af9428e624be9e16a7785afa207feaadad3e83210ec6f7540352f474502e8
+  source_file_sha256:
+    leaf_grouping/leaf-map.json: 3b4b253683c6911744959a3870a92509b1faa1ee34e9f8585e21d0fe6337a25b
+    splits/color_train.txt: c43e0205b321d1c929116f5df1842348ac1e5c4861306e081416785d3c439dbd
+    splits/color_test.txt: 7a7257dcb5f9456feae6ae81248d29c28f45dc4cd41a00c13a5c5c198c5f2f8b
+rationale: >-
+  The pinned source split contains five filename-reconstructed biological leaf
+  identities in both train and test. Preserving all official test samples and
+  excluding only their five source-train counterparts removes model exposure
+  to test leaves with the smallest protocol change. The ten conflict members
+  remain visible in lineage evidence; only five train samples become ineligible.
+selection_used_official_test_performance: false
+approved_by: project_owner
+approval_basis: explicit approval in the PlantXAI-Stability Codex task
+approved_at_utc: 2026-07-22
+notes: >-
+  Approval covers only the exact pinned revision, five selected classes,
+  evidence hashes and overlap identities recorded above. Any mismatch blocks
+  adjudication and requires a new Decision Record.
