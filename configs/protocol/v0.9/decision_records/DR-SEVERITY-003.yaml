@@ -1,0 +1,38 @@
+decision_id: DR-SEVERITY-003
+title: Rejection of severity pilot v3 uniform border-median rotation regions
+status: rejected
+decision_type: transformation_severity_visual_adjudication
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+pilot:
+  run_type: validation_only_image_space_severity_pilot
+  protocol_hash: 58c42c8251593f150ae917e4cb0b929825eded54138531c0140937d6137a4194
+  transformation_algorithm_version: shared_randomization_border_median_v3
+  test_split_accessed: false
+  technical_gate_passed: true
+evidence:
+  severity_pilot_summary_sha256: cf2fc59d22bb0686c136d6aef1edd8d840c35efddbdd790fba252281733f01fa
+  severity_pilot_selection_sha256: 961b79ef584261a50b597b66827ccf3fdde061dadb91b97ea074ae66112cc585
+  visual_artifact_sha256:
+    brightness: 3b8bbd1c586e8843778a89dfde59fe05605264f707d16ce1ec0f9f7dd4d28535
+    gaussian_blur: bdde97939eef6cec2a45e7aefd01bad316822f825ae087fb22d96c5f8f357aed
+    gaussian_noise: e8f573cc9ab5440f40f3d1c55d9dcb7e288755985ff5afe677ce48989b11a05e
+    rotation: 5121d292e0b8a32dcf41ccc1d1e2d93316e28f06832ba1bb8fe24412d3d34562
+visual_review:
+  brightness: pass_unchanged
+  gaussian_blur: pass_unchanged
+  gaussian_noise: pass_unchanged
+  rotation: fail
+  rotation_failure_reason: >-
+    Border-median fill removes black corners but leaves uniform polygonal
+    regions whose area still increases with rotation severity. The color is
+    less salient, but the severity-correlated shortcut remains.
+decision: >-
+  Reject v3 for G0B. A background-colored constant region is not sufficient to
+  isolate biological rotation from padding artifacts.
+required_corrective_action: >-
+  Reflect-pad the source image on a canvas sized for the maximum declared angle,
+  rotate that canvas, center-crop the original dimensions, and hard-fail if a
+  validity mask detects any outside-canvas fill in the final crop.
+adjudicated_by: research_methodology_quality_gate
+evidence_submitted_by: project_owner
+adjudicated_at_utc: 2026-07-22

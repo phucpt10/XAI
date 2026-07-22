@@ -94,5 +94,7 @@ field, were independently resampled at each severity. `DR-SEVERITY-001`
 permanently rejects that run. The protocol now pins `shared_randomization_v2`;
 pilot v2 corrected shared randomization, but its rotation contact sheet exposed
 severity-correlated black corners. `DR-SEVERITY-002` rejects the complete v2
-set. The protocol now pins `shared_randomization_border_median_v3`; pilot and
-visual-review evidence must be regenerated in new v3 directories.
+set. The v3 border-median replacement still produced uniform corner polygons;
+`DR-SEVERITY-003` rejects that run. The protocol now pins
+`shared_randomization_reflect_pad_v4`; pilot and visual-review evidence must be
+regenerated in new v4 directories.

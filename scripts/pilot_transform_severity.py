@@ -117,15 +117,19 @@ def main() -> int:
     shared_randomization_seed_consistent = all(
         len(seeds) == 1 for seeds in randomization_seeds.values()
     )
-    rotation_fill_policy_passed = all(
-        json.loads(str(row["exact_parameters_json"])).get("fill_policy")
-        == "border_median"
+    rotation_reflect_pad_no_fill_passed = all(
+        json.loads(str(row["exact_parameters_json"])).get("padding_policy")
+        == "reflect"
+        and json.loads(str(row["exact_parameters_json"])).get(
+            "outside_canvas_fill_pixel_count"
+        )
+        == 0
         and len(
             json.loads(str(row["exact_parameters_json"])).get(
-                "resolved_fill_rgb_uint8", []
+                "resolved_padding_tblr", []
             )
         )
-        == 3
+        == 4
         for row in rows
         if row["transformation"] == "rotation"
     )
@@ -137,7 +141,7 @@ def main() -> int:
         and summary["ordinal_gate_passed"]
         and deterministic_recheck_passed
         and shared_randomization_seed_consistent
-        and rotation_fill_policy_passed
+        and rotation_reflect_pad_no_fill_passed
     )
     args.output_dir.mkdir(parents=True, exist_ok=False)
     records_path = args.output_dir / "severity_pilot_records.parquet"
@@ -175,7 +179,7 @@ def main() -> int:
         ),
         "deterministic_recheck_passed": deterministic_recheck_passed,
         "shared_randomization_seed_consistent": shared_randomization_seed_consistent,
-        "rotation_border_median_fill_passed": rotation_fill_policy_passed,
+        "rotation_reflect_pad_no_fill_passed": rotation_reflect_pad_no_fill_passed,
         "summary": summary,
         "acceptance_criteria": {
             "validation_only": True,
@@ -190,7 +194,9 @@ def main() -> int:
             "shared_randomization_seed_consistent": (
                 shared_randomization_seed_consistent
             ),
-            "rotation_border_median_fill_passed": rotation_fill_policy_passed,
+            "rotation_reflect_pad_no_fill_passed": (
+                rotation_reflect_pad_no_fill_passed
+            ),
         },
         "technical_gate_passed": technical_gate_passed,
         "decision": (

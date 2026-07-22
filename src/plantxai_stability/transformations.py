@@ -11,7 +11,7 @@ import numpy as np
 from plantxai_stability.contracts import TransformationRecord
 
 
-TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_border_median_v3"
+TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_reflect_pad_v4"
 
 
 def derive_seed(global_seed: int, sample_id: str, scenario_id: str) -> int:
@@ -57,14 +57,17 @@ class TransformationPipeline:
             angle = float(params["angle_degrees"])
             direction = -1.0 if int(rng.integers(0, 2)) == 0 else 1.0
             angle *= direction
-            if params.get("fill_policy") != "border_median":
-                raise ValueError("Rotation requires fill_policy=border_median")
-            border_fraction = float(params.get("border_fraction", 0.05))
-            fill_rgb = self._border_median_fill(output, border_fraction)
-            output = self._rotate(output, angle, fill_rgb)
+            if params.get("padding_policy") != "reflect":
+                raise ValueError("Rotation requires padding_policy=reflect")
+            maximum_angle = float(params.get("padding_max_angle_degrees", 45.0))
+            margin = int(params.get("padding_margin_pixels", 2))
+            output, padding, leakage_count = self._rotate_reflect_pad_crop(
+                output, angle, maximum_angle, margin
+            )
             inverse = {"kind": "rotation", "angle_degrees": -angle}
             params["angle_degrees"] = angle
-            params["resolved_fill_rgb_uint8"] = list(fill_rgb)
+            params["resolved_padding_tblr"] = list(padding)
+            params["outside_canvas_fill_pixel_count"] = leakage_count
         else:
             raise ValueError(f"Unsupported transformation: {scenario.transformation}")
         record = TransformationRecord(sample_id, scenario.scenario_id, scenario.transformation, scenario.severity, seed, params, inverse, None)
@@ -83,42 +86,55 @@ class TransformationPipeline:
         return np.asarray(blurred, dtype=np.float32) / 255.0
 
     @staticmethod
-    def _rotate(
-        pixels: np.ndarray, angle: float, fill_rgb: tuple[int, int, int]
-    ) -> np.ndarray:
+    def _rotate_reflect_pad_crop(
+        pixels: np.ndarray,
+        angle: float,
+        maximum_angle: float,
+        margin: int,
+    ) -> tuple[np.ndarray, tuple[int, int, int, int], int]:
         try:
             from PIL import Image
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("Pillow is required for rotation") from exc
-        image = Image.fromarray(np.uint8(np.clip(pixels, 0, 1) * 255.0))
+        if maximum_angle < abs(angle) or maximum_angle > 45.0:
+            raise ValueError("padding_max_angle_degrees must cover angle and be <= 45")
+        if margin < 1:
+            raise ValueError("padding_margin_pixels must be positive")
+        height, width, _ = pixels.shape
+        radians = np.deg2rad(maximum_angle)
+        cosine = abs(float(np.cos(radians)))
+        sine = abs(float(np.sin(radians)))
+        pad_x = max(0, int(np.ceil((cosine * width + sine * height - width) / 2))) + margin
+        pad_y = max(0, int(np.ceil((sine * width + cosine * height - height) / 2))) + margin
+        padded = np.pad(
+            pixels,
+            ((pad_y, pad_y), (pad_x, pad_x), (0, 0)),
+            mode="reflect",
+        )
+        image = Image.fromarray(np.uint8(np.clip(padded, 0, 1) * 255.0))
         rotated = image.rotate(
             angle,
             resample=Image.Resampling.BILINEAR,
             expand=False,
-            fillcolor=fill_rgb,
+            fillcolor=(0, 0, 0),
         )
-        return np.asarray(rotated, dtype=np.float32) / 255.0
-
-    @staticmethod
-    def _border_median_fill(
-        pixels: np.ndarray, border_fraction: float
-    ) -> tuple[int, int, int]:
-        if not 0.0 < border_fraction <= 0.25:
-            raise ValueError("border_fraction must be in (0, 0.25]")
-        height, width, _ = pixels.shape
-        border = max(1, int(round(min(height, width) * border_fraction)))
-        border_pixels = np.concatenate(
-            (
-                pixels[:border].reshape(-1, 3),
-                pixels[-border:].reshape(-1, 3),
-                pixels[border:-border, :border].reshape(-1, 3),
-                pixels[border:-border, -border:].reshape(-1, 3),
-            ),
-            axis=0,
+        validity = Image.fromarray(
+            np.full(padded.shape[:2], 255, dtype=np.uint8)
         )
-        resolved = np.rint(np.median(border_pixels, axis=0) * 255.0)
-        clipped = np.clip(resolved, 0, 255)
-        return int(clipped[0]), int(clipped[1]), int(clipped[2])
+        rotated_validity = validity.rotate(
+            angle,
+            resample=Image.Resampling.NEAREST,
+            expand=False,
+            fillcolor=0,
+        )
+        left, top = pad_x, pad_y
+        box = (left, top, left + width, top + height)
+        cropped = np.asarray(rotated.crop(box), dtype=np.float32) / 255.0
+        cropped_validity = np.asarray(rotated_validity.crop(box), dtype=np.uint8)
+        leakage_count = int(np.count_nonzero(cropped_validity != 255))
+        if leakage_count:
+            raise ValueError("Reflect padding did not cover the final rotation crop")
+        return cropped, (pad_y, pad_y, pad_x, pad_x), leakage_count
 
 
 def scenario_grid(parameter_config: dict[str, Any]) -> list[Scenario]:
