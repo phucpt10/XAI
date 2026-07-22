@@ -73,7 +73,7 @@ class TransformationPipeline:
             raise RuntimeError("Pillow is required for Gaussian blur") from exc
         if kernel_size % 2 == 0:
             raise ValueError("Gaussian blur kernel_size must be odd")
-        image = Image.fromarray(np.uint8(np.clip(pixels, 0, 1) * 255.0), mode="RGB")
+        image = Image.fromarray(np.uint8(np.clip(pixels, 0, 1) * 255.0))
         blurred = image.filter(ImageFilter.GaussianBlur(radius=sigma))
         return np.asarray(blurred, dtype=np.float32) / 255.0
 
@@ -83,7 +83,7 @@ class TransformationPipeline:
             from PIL import Image
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("Pillow is required for rotation") from exc
-        image = Image.fromarray(np.uint8(np.clip(pixels, 0, 1) * 255.0), mode="RGB")
+        image = Image.fromarray(np.uint8(np.clip(pixels, 0, 1) * 255.0))
         rotated = image.rotate(angle, resample=Image.Resampling.BILINEAR, expand=False, fillcolor=tuple([int(fill * 255)] * 3))
         return np.asarray(rotated, dtype=np.float32) / 255.0
 

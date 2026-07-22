@@ -51,7 +51,7 @@ def preprocess_for_model(
         raise RuntimeError("Pillow is required for model preprocessing") from exc
     if pixels.ndim != 3 or pixels.shape[2] != 3:
         raise ValueError(f"Expected HxWx3 RGB pixels, got {pixels.shape}")
-    image = Image.fromarray(np.uint8(np.clip(pixels, 0.0, 1.0) * 255.0), mode="RGB")
+    image = Image.fromarray(np.uint8(np.clip(pixels, 0.0, 1.0) * 255.0))
     target_h, target_w = image_size
     scale = max(target_h / image.height, target_w / image.width)
     resized_size = (max(target_w, round(image.width * scale)), max(target_h, round(image.height * scale)))

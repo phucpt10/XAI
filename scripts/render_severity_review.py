@@ -147,7 +147,7 @@ def _render_sheet(
             images.append(transformed)
         for column_index, pixels in enumerate(images):
             image = Image.fromarray(
-                np.uint8(np.clip(pixels, 0.0, 1.0) * 255.0), mode="RGB"
+                np.uint8(np.clip(pixels, 0.0, 1.0) * 255.0)
             ).resize((tile, tile), Image.Resampling.BILINEAR)
             canvas.paste(image, (label_width + column_index * tile, top))
     canvas.save(path, format="PNG")

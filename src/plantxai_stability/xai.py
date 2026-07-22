@@ -41,9 +41,9 @@ def inverse_align_heatmap(heatmap: np.ndarray, inverse_metadata: dict[str, Any])
         raise RuntimeError("Pillow is required for heatmap alignment") from exc
     angle = float(inverse_metadata["angle_degrees"])
     array = np.asarray(heatmap, dtype=np.float32)
-    image = Image.fromarray(array, mode="F")
+    image = Image.fromarray(array)
     aligned = np.asarray(image.rotate(angle, resample=Image.Resampling.BILINEAR, expand=False, fillcolor=0.0), dtype=np.float32)
-    valid_source = Image.fromarray(np.ones(array.shape, dtype=np.float32), mode="F")
+    valid_source = Image.fromarray(np.ones(array.shape, dtype=np.float32))
     mask = np.asarray(valid_source.rotate(angle, resample=Image.Resampling.BILINEAR, expand=False, fillcolor=0.0), dtype=np.float32) > 0.999
     if not mask.any():
         raise ValueError("Inverse alignment produced an empty valid-overlap mask")
