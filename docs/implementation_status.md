@@ -36,7 +36,7 @@ Date: 2026-07-22
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (23 tests)
+pytest                          PASS (24 tests)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)

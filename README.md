@@ -10,6 +10,8 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - JSON schema and fail-closed protocol loader.
 - Immutable data contracts for samples, predictions, transformations and joint records.
 - Canonical RGB hashing and deterministic `sample_id` construction.
+- Source-lineage-preserving materialized paths, including distinct identities
+  for different source samples with identical canonical RGB pixels.
 - Optional Hugging Face Datasets adapter for `mohanty/PlantVillage` with schema
   inspection, `leaf_id` validation and manifest materialisation.
 - Dataset receipt, image-level audit, duplicate/conflict detection and immutable

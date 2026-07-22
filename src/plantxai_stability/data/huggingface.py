@@ -7,6 +7,7 @@ explicit and auditable.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -126,9 +127,16 @@ def inspect_hf_schema(
 
 
 def _image_source_key(
-    image: Any, digest: str, dataset_id: str, configuration: str, split: str
+    image: Any,
+    digest: str,
+    dataset_id: str,
+    configuration: str,
+    split: str,
+    declared_source_path: Any = None,
 ) -> str:
     """Return a stable source key without using a row index."""
+    if declared_source_path not in (None, ""):
+        return str(declared_source_path).replace("\\", "/")
     if isinstance(image, dict) and image.get("path"):
         return str(image["path"]).replace("\\", "/")
     path = getattr(image, "filename", None) or getattr(image, "path", None)
@@ -179,12 +187,22 @@ def iter_manifest_rows(
             if leaf_id in (None, ""):
                 raise ValueError("PlantVillage row has an empty leaf_id; refusing unsafe splits")
             source_key = _image_source_key(
-                image, digest, schema.dataset_id, schema.configuration, split_name
+                image,
+                digest,
+                schema.dataset_id,
+                schema.configuration,
+                split_name,
+                row.get("image_path"),
             )
             if materialize_root is not None:
                 # Export decoded RGB pixels so the existing filesystem-backed
                 # PyTorch Dataset can consume the exact audited bytes in Colab.
-                relative = Path("images") / split_name / class_name / f"{digest}.png"
+                # The source-key digest preserves lineage when two distinct
+                # source samples have identical canonical RGB pixels.
+                source_key_sha256 = hashlib.sha256(source_key.encode("utf-8")).hexdigest()
+                relative = (
+                    Path("images") / split_name / class_name / f"{source_key_sha256}.png"
+                )
                 output = Path(materialize_root) / relative
                 output.parent.mkdir(parents=True, exist_ok=True)
                 if not output.exists():
