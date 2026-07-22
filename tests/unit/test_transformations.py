@@ -42,7 +42,11 @@ def test_rotation_direction_is_shared_across_severity() -> None:
             f"rotation_{name}",
             "rotation",
             name,
-            {"angle_degrees": angle, "fill": 0.0},
+            {
+                "angle_degrees": angle,
+                "fill_policy": "border_median",
+                "border_fraction": 0.05,
+            },
         )
         for name, angle in (("mild", 10.0), ("moderate", 25.0), ("severe", 45.0))
     ]
@@ -50,6 +54,24 @@ def test_rotation_direction_is_shared_across_severity() -> None:
     signed_angles = [float(record.parameters["angle_degrees"]) for record in records]
     assert all(angle > 0 for angle in signed_angles) or all(angle < 0 for angle in signed_angles)
     assert [abs(angle) for angle in signed_angles] == [10.0, 25.0, 45.0]
+
+
+def test_rotation_resolves_border_median_instead_of_black_fill() -> None:
+    pixels = np.full((32, 32, 3), 0.6, dtype=np.float32)
+    pixels[8:24, 8:24] = 0.2
+    scenario = Scenario(
+        "rotation_mild",
+        "rotation",
+        "mild",
+        {
+            "angle_degrees": 10.0,
+            "fill_policy": "border_median",
+            "border_fraction": 0.05,
+        },
+    )
+    output, record = TransformationPipeline(42, {}).apply(pixels, "pv_a", scenario)
+    assert record.parameters["resolved_fill_rgb_uint8"] == [153, 153, 153]
+    assert float(output[0, 0].min()) > 0.5
 
 
 def test_gaussian_noise_uses_shared_standard_field() -> None:

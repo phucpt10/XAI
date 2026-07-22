@@ -11,7 +11,7 @@ import numpy as np
 from plantxai_stability.contracts import TransformationRecord
 
 
-TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_v2"
+TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_border_median_v3"
 
 
 def derive_seed(global_seed: int, sample_id: str, scenario_id: str) -> int:
@@ -57,9 +57,14 @@ class TransformationPipeline:
             angle = float(params["angle_degrees"])
             direction = -1.0 if int(rng.integers(0, 2)) == 0 else 1.0
             angle *= direction
-            output = self._rotate(output, angle, float(params.get("fill", 0.0)))
+            if params.get("fill_policy") != "border_median":
+                raise ValueError("Rotation requires fill_policy=border_median")
+            border_fraction = float(params.get("border_fraction", 0.05))
+            fill_rgb = self._border_median_fill(output, border_fraction)
+            output = self._rotate(output, angle, fill_rgb)
             inverse = {"kind": "rotation", "angle_degrees": -angle}
             params["angle_degrees"] = angle
+            params["resolved_fill_rgb_uint8"] = list(fill_rgb)
         else:
             raise ValueError(f"Unsupported transformation: {scenario.transformation}")
         record = TransformationRecord(sample_id, scenario.scenario_id, scenario.transformation, scenario.severity, seed, params, inverse, None)
@@ -78,14 +83,42 @@ class TransformationPipeline:
         return np.asarray(blurred, dtype=np.float32) / 255.0
 
     @staticmethod
-    def _rotate(pixels: np.ndarray, angle: float, fill: float) -> np.ndarray:
+    def _rotate(
+        pixels: np.ndarray, angle: float, fill_rgb: tuple[int, int, int]
+    ) -> np.ndarray:
         try:
             from PIL import Image
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("Pillow is required for rotation") from exc
         image = Image.fromarray(np.uint8(np.clip(pixels, 0, 1) * 255.0))
-        rotated = image.rotate(angle, resample=Image.Resampling.BILINEAR, expand=False, fillcolor=tuple([int(fill * 255)] * 3))
+        rotated = image.rotate(
+            angle,
+            resample=Image.Resampling.BILINEAR,
+            expand=False,
+            fillcolor=fill_rgb,
+        )
         return np.asarray(rotated, dtype=np.float32) / 255.0
+
+    @staticmethod
+    def _border_median_fill(
+        pixels: np.ndarray, border_fraction: float
+    ) -> tuple[int, int, int]:
+        if not 0.0 < border_fraction <= 0.25:
+            raise ValueError("border_fraction must be in (0, 0.25]")
+        height, width, _ = pixels.shape
+        border = max(1, int(round(min(height, width) * border_fraction)))
+        border_pixels = np.concatenate(
+            (
+                pixels[:border].reshape(-1, 3),
+                pixels[-border:].reshape(-1, 3),
+                pixels[border:-border, :border].reshape(-1, 3),
+                pixels[border:-border, -border:].reshape(-1, 3),
+            ),
+            axis=0,
+        )
+        resolved = np.rint(np.median(border_pixels, axis=0) * 255.0)
+        clipped = np.clip(resolved, 0, 255)
+        return int(clipped[0]), int(clipped[1]), int(clipped[2])
 
 
 def scenario_grid(parameter_config: dict[str, Any]) -> list[Scenario]:

@@ -74,7 +74,7 @@ training:
   deterministic_algorithms: true
 
 transformations:
-  algorithm_version: shared_randomization_v2
+  algorithm_version: shared_randomization_border_median_v3
   names: [rotation, brightness, gaussian_noise, gaussian_blur]
   severities: [mild, moderate, severe]
   materialize_images: false
@@ -82,9 +82,9 @@ transformations:
   record_exact_parameters: true
   parameters:
     rotation:
-      mild: {angle_degrees: 10.0, fill: 0.0, interpolation: bilinear}
-      moderate: {angle_degrees: 25.0, fill: 0.0, interpolation: bilinear}
-      severe: {angle_degrees: 45.0, fill: 0.0, interpolation: bilinear}
+      mild: {angle_degrees: 10.0, fill_policy: border_median, border_fraction: 0.05, interpolation: bilinear}
+      moderate: {angle_degrees: 25.0, fill_policy: border_median, border_fraction: 0.05, interpolation: bilinear}
+      severe: {angle_degrees: 45.0, fill_policy: border_median, border_fraction: 0.05, interpolation: bilinear}
     brightness:
       mild: {factor: 0.10}
       moderate: {factor: 0.30}

@@ -179,15 +179,17 @@ Use a new immutable output directory for each attempt:
 
 Pilot v1 is permanently rejected by `DR-SEVERITY-001`: it independently drew
 brightness/rotation direction and Gaussian noise at every severity. The pinned
-`shared_randomization_v2` algorithm holds those nuisance variables fixed while
-only perturbation magnitude changes.
+v2 algorithm fixed that error, but `DR-SEVERITY-002` rejects its constant-black
+rotation fill as a severity-correlated shortcut. The pinned
+`shared_randomization_border_median_v3` algorithm also resolves a deterministic
+per-image background fill from the outer 5% border.
 
 ```python
 !python scripts/pilot_transform_severity.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --output-dir /content/plantxai-severity-pilot-v2 \
+  --output-dir /content/plantxai-severity-pilot-v3 \
   --max-leaves-per-class 50 \
   --minimum-leaves-per-class 20
 ```
@@ -206,8 +208,8 @@ verifies the pilot artifact hashes before producing four contact sheets:
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --pilot-summary /content/plantxai-severity-pilot-v2/severity_pilot_summary.json \
-  --output-dir /content/plantxai-severity-review-v2
+  --pilot-summary /content/plantxai-severity-pilot-v3/severity_pilot_summary.json \
+  --output-dir /content/plantxai-severity-review-v3
 ```
 
 ## 6. Train and preserve checkpoints

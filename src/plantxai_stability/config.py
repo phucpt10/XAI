@@ -103,7 +103,10 @@ def _validate_protocol(values: dict[str, Any]) -> None:
     ):
         raise ValueError("Every model requires a runtime-approved XAI target layer")
     transformations = values["transformations"]
-    if transformations.get("algorithm_version") != "shared_randomization_v2":
+    if (
+        transformations.get("algorithm_version")
+        != "shared_randomization_border_median_v3"
+    ):
         raise ValueError("Unsupported transformation algorithm version")
     training = values["training"]
     if training.get("optimizer") != "adamw":

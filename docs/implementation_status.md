@@ -92,4 +92,7 @@ Severity pilot v1 passed its original numerical gate but failed human visual
 review because brightness and rotation direction, and the Gaussian base-noise
 field, were independently resampled at each severity. `DR-SEVERITY-001`
 permanently rejects that run. The protocol now pins `shared_randomization_v2`;
-pilot and visual-review evidence must be regenerated in new v2 directories.
+pilot v2 corrected shared randomization, but its rotation contact sheet exposed
+severity-correlated black corners. `DR-SEVERITY-002` rejects the complete v2
+set. The protocol now pins `shared_randomization_border_median_v3`; pilot and
+visual-review evidence must be regenerated in new v3 directories.
