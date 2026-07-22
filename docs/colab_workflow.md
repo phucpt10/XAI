@@ -170,7 +170,30 @@ manifest and create immutable split evidence:
 
 Training and evaluation must use the frozen split CSVs, never a directory scan.
 
-## 5. Train and preserve checkpoints
+## 5. Pilot transformation severity on validation only
+
+The severity pilot selects at most one sample per leaf, caps selection equally
+per declared class, and computes image-space MAE, RMSE, PSNR and SSIM for all
+twelve scenarios. It never loads a model or accesses the official test split.
+Use a new immutable output directory for each attempt:
+
+```python
+!python scripts/pilot_transform_severity.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
+  --image-root /content/plantxai-manifest-v2 \
+  --output-dir /content/plantxai-severity-pilot-v1 \
+  --max-leaves-per-class 50 \
+  --minimum-leaves-per-class 20
+```
+
+A technical PASS requires validation-only lineage, one sample per leaf, all
+twelve scenarios, finite metrics, deterministic repeat checks and strictly
+increasing median RMSE from mild to moderate to severe for each transformation.
+The report remains `pending_human_review`; it must not change the protocol or
+remove the severity blocker automatically.
+
+## 6. Train and preserve checkpoints
 
 The training API in `plantxai_stability.training` selects checkpoints only by
 validation macro-F1 and writes both the checkpoint hash and training history.
@@ -210,7 +233,7 @@ frozen protocol, a validated checkpoint and the XAI dependencies.
 Keep checkpoints and run outputs outside the source tree or in Git LFS/object
 storage; do not commit model weights to the normal Git history.
 
-## 6. Export results
+## 7. Export results
 
 Every run must have a unique `run_id` and write resolved configuration,
 predictions, heatmaps, metrics, statistics, tables, figures, logs and a
