@@ -182,17 +182,20 @@ brightness/rotation direction and Gaussian noise at every severity. The pinned
 v2 algorithm fixed that error, but `DR-SEVERITY-002` rejects its constant-black
 rotation fill as a severity-correlated shortcut. `DR-SEVERITY-003` rejects the
 v3 border-median fill because it still creates severity-correlated uniform
-polygons. The pinned `shared_randomization_reflect_pad_v4` algorithm applies one
-fixed reflect-padding geometry sufficient for the maximum angle, rotates that
-canvas and center-crops to the original dimensions. The pilot hard-fails if any
-outside-canvas fill pixel reaches the final crop.
+polygons. `DR-SEVERITY-004` rejects v4 because reflect padding repeats leaf
+fragments at the image borders. The pinned
+`shared_randomization_telea_inpainting_v5` candidate derives its mask from
+rotation geometry and completes only that region with CPU OpenCV Telea. It
+records all synthesized pixels, mask/output hashes, OpenCV version and requires
+human review; it must be described as rotation with Telea inpainting, not pure
+rotation.
 
 ```python
 !python scripts/pilot_transform_severity.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --output-dir /content/plantxai-severity-pilot-v4 \
+  --output-dir /content/plantxai-severity-pilot-v5 \
   --max-leaves-per-class 50 \
   --minimum-leaves-per-class 20
 ```
@@ -211,8 +214,8 @@ verifies the pilot artifact hashes before producing four contact sheets:
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --pilot-summary /content/plantxai-severity-pilot-v4/severity_pilot_summary.json \
-  --output-dir /content/plantxai-severity-review-v4
+  --pilot-summary /content/plantxai-severity-pilot-v5/severity_pilot_summary.json \
+  --output-dir /content/plantxai-severity-review-v5
 ```
 
 ## 6. Train and preserve checkpoints

@@ -74,7 +74,7 @@ training:
   deterministic_algorithms: true
 
 transformations:
-  algorithm_version: shared_randomization_reflect_pad_v4
+  algorithm_version: shared_randomization_telea_inpainting_v5
   names: [rotation, brightness, gaussian_noise, gaussian_blur]
   severities: [mild, moderate, severe]
   materialize_images: false
@@ -82,9 +82,9 @@ transformations:
   record_exact_parameters: true
   parameters:
     rotation:
-      mild: {angle_degrees: 10.0, padding_policy: reflect, padding_max_angle_degrees: 45.0, padding_margin_pixels: 2, interpolation: bilinear}
-      moderate: {angle_degrees: 25.0, padding_policy: reflect, padding_max_angle_degrees: 45.0, padding_margin_pixels: 2, interpolation: bilinear}
-      severe: {angle_degrees: 45.0, padding_policy: reflect, padding_max_angle_degrees: 45.0, padding_margin_pixels: 2, interpolation: bilinear}
+      mild: {angle_degrees: 10.0, completion_method: opencv_telea, inpaint_radius: 3.0, mask_dilation_pixels: 1, interpolation: bilinear, mask_interpolation: nearest, opencv_distribution_version: "4.13.0.92"}
+      moderate: {angle_degrees: 25.0, completion_method: opencv_telea, inpaint_radius: 3.0, mask_dilation_pixels: 1, interpolation: bilinear, mask_interpolation: nearest, opencv_distribution_version: "4.13.0.92"}
+      severe: {angle_degrees: 45.0, completion_method: opencv_telea, inpaint_radius: 3.0, mask_dilation_pixels: 1, interpolation: bilinear, mask_interpolation: nearest, opencv_distribution_version: "4.13.0.92"}
     brightness:
       mild: {factor: 0.10}
       moderate: {factor: 0.30}

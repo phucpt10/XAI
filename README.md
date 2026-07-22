@@ -28,8 +28,9 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Deterministic rotation, brightness, Gaussian noise and Gaussian blur transformations.
 - Shared-randomization transformation algorithm: each sample keeps the same
   brightness/rotation direction or base noise field across severity levels.
-- Rotation reflect-pads every image for the frozen maximum angle, rotates the
-  padded canvas and center-crops it, preventing severity-correlated fill areas.
+- Rotation v5 derives missing pixels from a rotated geometric validity mask and
+  completes only that declared region with deterministic OpenCV Telea
+  inpainting. Synthesized area, masks, runtime version and output are hashed.
 - Validation-only, leaf-balanced image-space severity pilot with immutable
   per-sample metrics and an explicit human-approval gate.
 - Optional PyTorch model wrappers for ResNet50 and EfficientNet-B0.

@@ -105,7 +105,7 @@ def _validate_protocol(values: dict[str, Any]) -> None:
     transformations = values["transformations"]
     if (
         transformations.get("algorithm_version")
-        != "shared_randomization_reflect_pad_v4"
+        != "shared_randomization_telea_inpainting_v5"
     ):
         raise ValueError("Unsupported transformation algorithm version")
     training = values["training"]

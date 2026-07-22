@@ -95,6 +95,7 @@ permanently rejects that run. The protocol now pins `shared_randomization_v2`;
 pilot v2 corrected shared randomization, but its rotation contact sheet exposed
 severity-correlated black corners. `DR-SEVERITY-002` rejects the complete v2
 set. The v3 border-median replacement still produced uniform corner polygons;
-`DR-SEVERITY-003` rejects that run. The protocol now pins
-`shared_randomization_reflect_pad_v4`; pilot and visual-review evidence must be
-regenerated in new v4 directories.
+`DR-SEVERITY-003` rejects that run. V4 removed uniform fill but repeated leaf
+fragments through reflection, so `DR-SEVERITY-004` rejects it. The protocol now
+pins validation-only candidate `shared_randomization_telea_inpainting_v5`;
+pilot and visual-review evidence must be regenerated in new v5 directories.

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import numpy as np
 
 from plantxai_stability.config import load_protocol
 from plantxai_stability.contracts import SampleRecord
@@ -102,6 +103,7 @@ def main() -> int:
                     "transformation": scenario.transformation,
                     "severity": scenario.severity,
                     "derived_seed": transformation_record.seed,
+                    "valid_mask_sha256": transformation_record.valid_mask_sha256,
                     "exact_parameters_json": json.dumps(
                         transformation_record.parameters, sort_keys=True
                     ),
@@ -117,22 +119,59 @@ def main() -> int:
     shared_randomization_seed_consistent = all(
         len(seeds) == 1 for seeds in randomization_seeds.values()
     )
-    rotation_reflect_pad_no_fill_passed = all(
-        json.loads(str(row["exact_parameters_json"])).get("padding_policy")
-        == "reflect"
-        and json.loads(str(row["exact_parameters_json"])).get(
-            "outside_canvas_fill_pixel_count"
-        )
-        == 0
-        and len(
-            json.loads(str(row["exact_parameters_json"])).get(
-                "resolved_padding_tblr", []
-            )
-        )
-        == 4
-        for row in rows
-        if row["transformation"] == "rotation"
+    rotation_rows = [row for row in rows if row["transformation"] == "rotation"]
+    rotation_parameters = [
+        json.loads(str(row["exact_parameters_json"])) for row in rotation_rows
+    ]
+    opencv_runtime_versions = sorted(
+        {str(parameters.get("opencv_version")) for parameters in rotation_parameters}
     )
+    opencv_distribution_versions = sorted(
+        {
+            str(parameters.get("opencv_distribution_version"))
+            for parameters in rotation_parameters
+        }
+    )
+    rotation_telea_completion_passed = bool(rotation_rows) and all(
+        parameters.get("completion_method") == "opencv_telea"
+        and parameters.get("rotation_completion_method") == "opencv_telea"
+        and int(parameters.get("known_pixel_change_count", -1)) == 0
+        and int(parameters.get("geometric_invalid_pixel_count", 0)) > 0
+        and int(parameters.get("inpainted_pixel_count", 0))
+        >= int(parameters.get("geometric_invalid_pixel_count", 0))
+        and 0.0 < float(parameters.get("inpainted_fraction", 0.0)) < 1.0
+        and len(str(parameters.get("inpaint_mask_sha256", ""))) == 64
+        and len(str(parameters.get("inpainted_output_rgb_sha256", ""))) == 64
+        and int(parameters.get("opencv_num_threads", -1)) == 1
+        and parameters.get("opencv_opencl_enabled") is False
+        and len(str(row.get("valid_mask_sha256") or "")) == 64
+        for row, parameters in zip(rotation_rows, rotation_parameters)
+    )
+    fractions_by_sample: dict[str, dict[str, float]] = {}
+    for row, parameters in zip(rotation_rows, rotation_parameters):
+        fractions_by_sample.setdefault(str(row["sample_id"]), {})[
+            str(row["severity"])
+        ] = float(parameters["inpainted_fraction"])
+    rotation_inpainted_fraction_strictly_increases = all(
+        set(values) == {"mild", "moderate", "severe"}
+        and values["mild"] < values["moderate"] < values["severe"]
+        for values in fractions_by_sample.values()
+    )
+    rotation_inpainted_fraction_summary = {}
+    for severity in ("mild", "moderate", "severe"):
+        values = np.asarray(
+            [
+                float(parameters["inpainted_fraction"])
+                for row, parameters in zip(rotation_rows, rotation_parameters)
+                if row["severity"] == severity
+            ],
+            dtype=np.float64,
+        )
+        rotation_inpainted_fraction_summary[severity] = {
+            "mean": float(values.mean()),
+            "median": float(np.median(values)),
+            "q95": float(np.quantile(values, 0.95)),
+        }
     technical_gate_passed = bool(
         len(selected) == len(set(selected_ids))
         and all(record.split == "validation" for record in selected)
@@ -141,7 +180,10 @@ def main() -> int:
         and summary["ordinal_gate_passed"]
         and deterministic_recheck_passed
         and shared_randomization_seed_consistent
-        and rotation_reflect_pad_no_fill_passed
+        and rotation_telea_completion_passed
+        and rotation_inpainted_fraction_strictly_increases
+        and len(opencv_runtime_versions) == 1
+        and len(opencv_distribution_versions) == 1
     )
     args.output_dir.mkdir(parents=True, exist_ok=False)
     records_path = args.output_dir / "severity_pilot_records.parquet"
@@ -179,7 +221,13 @@ def main() -> int:
         ),
         "deterministic_recheck_passed": deterministic_recheck_passed,
         "shared_randomization_seed_consistent": shared_randomization_seed_consistent,
-        "rotation_reflect_pad_no_fill_passed": rotation_reflect_pad_no_fill_passed,
+        "rotation_telea_completion_passed": rotation_telea_completion_passed,
+        "rotation_inpainted_fraction_strictly_increases": (
+            rotation_inpainted_fraction_strictly_increases
+        ),
+        "rotation_inpainted_fraction_summary": rotation_inpainted_fraction_summary,
+        "opencv_runtime_versions": opencv_runtime_versions,
+        "opencv_distribution_versions": opencv_distribution_versions,
         "summary": summary,
         "acceptance_criteria": {
             "validation_only": True,
@@ -194,8 +242,13 @@ def main() -> int:
             "shared_randomization_seed_consistent": (
                 shared_randomization_seed_consistent
             ),
-            "rotation_reflect_pad_no_fill_passed": (
-                rotation_reflect_pad_no_fill_passed
+            "rotation_telea_completion_passed": rotation_telea_completion_passed,
+            "rotation_inpainted_fraction_strictly_increases": (
+                rotation_inpainted_fraction_strictly_increases
+            ),
+            "single_opencv_runtime_version": len(opencv_runtime_versions) == 1,
+            "single_opencv_distribution_version": (
+                len(opencv_distribution_versions) == 1
             ),
         },
         "technical_gate_passed": technical_gate_passed,

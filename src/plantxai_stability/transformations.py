@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from importlib.metadata import version
 from typing import Any
 
 import numpy as np
@@ -11,7 +12,7 @@ import numpy as np
 from plantxai_stability.contracts import TransformationRecord
 
 
-TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_reflect_pad_v4"
+TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_telea_inpainting_v5"
 
 
 def derive_seed(global_seed: int, sample_id: str, scenario_id: str) -> int:
@@ -57,20 +58,29 @@ class TransformationPipeline:
             angle = float(params["angle_degrees"])
             direction = -1.0 if int(rng.integers(0, 2)) == 0 else 1.0
             angle *= direction
-            if params.get("padding_policy") != "reflect":
-                raise ValueError("Rotation requires padding_policy=reflect")
-            maximum_angle = float(params.get("padding_max_angle_degrees", 45.0))
-            margin = int(params.get("padding_margin_pixels", 2))
-            output, padding, leakage_count = self._rotate_reflect_pad_crop(
-                output, angle, maximum_angle, margin
+            if params.get("completion_method") != "opencv_telea":
+                raise ValueError("Rotation requires completion_method=opencv_telea")
+            radius = float(params.get("inpaint_radius", 3.0))
+            dilation = int(params.get("mask_dilation_pixels", 1))
+            expected_opencv = str(params["opencv_distribution_version"])
+            output, completion, valid_mask_sha256 = self._rotate_telea_inpaint(
+                output, angle, radius, dilation, expected_opencv
             )
             inverse = {"kind": "rotation", "angle_degrees": -angle}
             params["angle_degrees"] = angle
-            params["resolved_padding_tblr"] = list(padding)
-            params["outside_canvas_fill_pixel_count"] = leakage_count
+            params.update(completion)
         else:
             raise ValueError(f"Unsupported transformation: {scenario.transformation}")
-        record = TransformationRecord(sample_id, scenario.scenario_id, scenario.transformation, scenario.severity, seed, params, inverse, None)
+        record = TransformationRecord(
+            sample_id,
+            scenario.scenario_id,
+            scenario.transformation,
+            scenario.severity,
+            seed,
+            params,
+            inverse,
+            valid_mask_sha256 if scenario.transformation == "rotation" else None,
+        )
         return output, record
 
     @staticmethod
@@ -86,55 +96,93 @@ class TransformationPipeline:
         return np.asarray(blurred, dtype=np.float32) / 255.0
 
     @staticmethod
-    def _rotate_reflect_pad_crop(
+    def _rotate_telea_inpaint(
         pixels: np.ndarray,
         angle: float,
-        maximum_angle: float,
-        margin: int,
-    ) -> tuple[np.ndarray, tuple[int, int, int, int], int]:
+        radius: float,
+        dilation_pixels: int,
+        expected_opencv_distribution_version: str,
+    ) -> tuple[np.ndarray, dict[str, Any], str]:
         try:
-            from PIL import Image
+            import cv2
         except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("Pillow is required for rotation") from exc
-        if maximum_angle < abs(angle) or maximum_angle > 45.0:
-            raise ValueError("padding_max_angle_degrees must cover angle and be <= 45")
-        if margin < 1:
-            raise ValueError("padding_margin_pixels must be positive")
+            raise RuntimeError("OpenCV is required for Telea rotation completion") from exc
+        distribution_version = version("opencv-python-headless")
+        if distribution_version != expected_opencv_distribution_version:
+            raise ValueError(
+                "OpenCV distribution version mismatch: "
+                f"expected {expected_opencv_distribution_version}, "
+                f"found {distribution_version}"
+            )
+        if not 0.0 < radius <= 10.0:
+            raise ValueError("inpaint_radius must be in (0, 10]")
+        if not 0 <= dilation_pixels <= 5:
+            raise ValueError("mask_dilation_pixels must be in [0, 5]")
+        cv2.setNumThreads(1)
+        if hasattr(cv2, "ocl"):
+            cv2.ocl.setUseOpenCL(False)
         height, width, _ = pixels.shape
-        radians = np.deg2rad(maximum_angle)
-        cosine = abs(float(np.cos(radians)))
-        sine = abs(float(np.sin(radians)))
-        pad_x = max(0, int(np.ceil((cosine * width + sine * height - width) / 2))) + margin
-        pad_y = max(0, int(np.ceil((sine * width + cosine * height - height) / 2))) + margin
-        padded = np.pad(
-            pixels,
-            ((pad_y, pad_y), (pad_x, pad_x), (0, 0)),
-            mode="reflect",
+        source = np.rint(np.clip(pixels, 0.0, 1.0) * 255.0).astype(np.uint8)
+        center = ((width - 1) / 2.0, (height - 1) / 2.0)
+        matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+        rotated = cv2.warpAffine(
+            source,
+            matrix,
+            (width, height),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(0.0, 0.0, 0.0),
         )
-        image = Image.fromarray(np.uint8(np.clip(padded, 0, 1) * 255.0))
-        rotated = image.rotate(
-            angle,
-            resample=Image.Resampling.BILINEAR,
-            expand=False,
-            fillcolor=(0, 0, 0),
+        rotated_validity = cv2.warpAffine(
+            np.full((height, width), 255, dtype=np.uint8),
+            matrix,
+            (width, height),
+            flags=cv2.INTER_NEAREST,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0,
         )
-        validity = Image.fromarray(
-            np.full(padded.shape[:2], 255, dtype=np.uint8)
+        geometric_mask = np.where(rotated_validity == 0, 255, 0).astype(np.uint8)
+        invalid_pixel_count = int(np.count_nonzero(geometric_mask))
+        if invalid_pixel_count == 0:
+            raise ValueError("Rotation produced no geometric completion region")
+        inpaint_mask = np.asarray(geometric_mask, dtype=np.uint8)
+        if dilation_pixels:
+            size = 2 * dilation_pixels + 1
+            kernel = np.ones((size, size), dtype=np.uint8)
+            inpaint_mask = np.asarray(
+                cv2.dilate(inpaint_mask, kernel, iterations=1), dtype=np.uint8
+            )
+        completed = cv2.inpaint(
+            rotated,
+            inpaint_mask,
+            inpaintRadius=radius,
+            flags=cv2.INPAINT_TELEA,
         )
-        rotated_validity = validity.rotate(
-            angle,
-            resample=Image.Resampling.NEAREST,
-            expand=False,
-            fillcolor=0,
+        known = inpaint_mask == 0
+        known_pixel_change_count = int(
+            np.count_nonzero(np.any(completed[known] != rotated[known], axis=1))
         )
-        left, top = pad_x, pad_y
-        box = (left, top, left + width, top + height)
-        cropped = np.asarray(rotated.crop(box), dtype=np.float32) / 255.0
-        cropped_validity = np.asarray(rotated_validity.crop(box), dtype=np.uint8)
-        leakage_count = int(np.count_nonzero(cropped_validity != 255))
-        if leakage_count:
-            raise ValueError("Reflect padding did not cover the final rotation crop")
-        return cropped, (pad_y, pad_y, pad_x, pad_x), leakage_count
+        if known_pixel_change_count:
+            raise ValueError("Telea changed pixels outside the declared inpaint mask")
+        inpainted_pixel_count = int(np.count_nonzero(inpaint_mask))
+        mask_sha256 = hashlib.sha256(inpaint_mask.tobytes()).hexdigest()
+        valid_mask_sha256 = hashlib.sha256((inpaint_mask == 0).tobytes()).hexdigest()
+        completion = {
+            "rotation_completion_method": "opencv_telea",
+            "opencv_version": str(cv2.__version__),
+            "opencv_distribution_version": distribution_version,
+            "opencv_num_threads": int(cv2.getNumThreads()),
+            "opencv_opencl_enabled": bool(
+                cv2.ocl.useOpenCL() if hasattr(cv2, "ocl") else False
+            ),
+            "geometric_invalid_pixel_count": invalid_pixel_count,
+            "inpainted_pixel_count": inpainted_pixel_count,
+            "inpainted_fraction": inpainted_pixel_count / float(height * width),
+            "inpaint_mask_sha256": mask_sha256,
+            "known_pixel_change_count": known_pixel_change_count,
+            "inpainted_output_rgb_sha256": hashlib.sha256(completed.tobytes()).hexdigest(),
+        }
+        return completed.astype(np.float32) / 255.0, completion, valid_mask_sha256
 
 
 def scenario_grid(parameter_config: dict[str, Any]) -> list[Scenario]:
