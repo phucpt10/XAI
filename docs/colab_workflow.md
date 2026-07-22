@@ -440,6 +440,51 @@ The baseline and joint runners recompute the full authorization chain before
 opening a test image. A G2 flag without matching Decision Records, readiness
 hash, checkpoint bytes, manifest/freeze lineage and test identities hard-fails.
 
+Run the registered joint campaign as six model-method parts. The launcher skips
+completed parts and resumes an interrupted part from its last transaction, so
+the same command is safe after a Colab disconnect:
+
+```python
+!python scripts/run_joint_campaign_colab.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
+  --image-root /content/plantxai-manifest-v2 \
+  --checkpoint-decision-record configs/protocol/v0.9/decision_records/DR-CHECKPOINT-001.yaml \
+  --test-decision-record configs/protocol/v0.9/decision_records/DR-TEST-001.yaml \
+  --g2-readiness-report /content/drive/MyDrive/PlantXAI-Stability/runs/g2-readiness-v1/g2_readiness_report.json \
+  --resnet50-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_best.pt \
+  --efficientnet-b0-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/efficientnet_b0_best.pt \
+  --output-root /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/joint-parts \
+  --device cuda
+```
+
+For a short first operational check, append
+`--only-model resnet50 --only-method grad_cam`. Then rerun the command without
+the filters; the completed part is skipped. Do not delete `run_state.json` or
+`joint_progress.sqlite3`. Every retry is bound to the same Git commit and all
+scientific identities; a code pull during an incomplete part intentionally
+blocks resume.
+
+After all six parts report `Official joint part: PASS`, merge the three parts
+for each model. Example for ResNet50:
+
+```python
+!python scripts/merge_joint_runs.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --baseline-report /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/resnet50-baseline/baseline_metrics.json \
+  --part-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/joint-parts/resnet50-grad_cam-v1 \
+  --part-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/joint-parts/resnet50-grad_cam_plus_plus-v1 \
+  --part-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/joint-parts/resnet50-score_cam-v1 \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/resnet50-joint-merged-v1 \
+  --run-id resnet50-joint-merged-v1
+```
+
+Replace `resnet50` with `efficientnet_b0` and use the EfficientNet baseline
+report for the second merge. A successful merged model contains exactly 20,316
+prediction rows (`1,693 x 12`) and 60,948 joint rows (`1,693 x 12 x 3`),
+including explicit exclusion rows where prediction consistency or CAM quality
+prevents a stability metric.
+
 Keep checkpoints and run outputs outside the source tree or in Git LFS/object
 storage; do not commit model weights to the normal Git history.
 

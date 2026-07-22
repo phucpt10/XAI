@@ -49,6 +49,13 @@ Date: 2026-07-23
 - Approved `DR-TEST-001` for one registered baseline and joint robustness/XAI
   campaign, with a separate metadata-only authorization verification required
   before official-test pixel access.
+- Authorized official baseline evaluation completed for both checkpoints:
+  ResNet50 accuracy 0.995275 / macro-F1 0.993991 (8 errors), and EfficientNet-B0
+  accuracy 0.995865 / macro-F1 0.995467 (7 errors), over all 1,693 test samples.
+- Model-method joint execution is transactionally resumable after Colab
+  interruption. Every committed sample contains the full 12-scenario cross
+  product; method parts are merged only after exact lineage, artifact hash,
+  prediction equality and factorial-coverage checks.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
@@ -58,7 +65,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (60 tests; torch integration skipped when unavailable)
+pytest                          PASS (69 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -67,9 +74,10 @@ constant heatmap gate          PASS
 
 ## Official experiment status
 
-G2 governance is approved for one registered campaign, but operational test
-access remains fail-closed until the runtime authorization verifier passes.
-Official training remains bound to the final G0B freeze. The protocol has:
+G2 governance and the runtime authorization gate both pass for the single
+registered campaign. Official baseline evaluation is complete for both models;
+joint robustness/XAI execution remains. Official training stays bound to the
+final G0B freeze. The protocol has:
 
 ```text
 status: frozen
@@ -92,8 +100,9 @@ Colab completed the cumulative quarantine, yielding 8,384 eligible samples,
 14 quarantined train samples and all 1,693 official test samples preserved.
 Leaf-safe freeze, deterministic loading, both backbone smoke runs and all six
 target-layer/CAM checks pass. `DR-RUNTIME-001` and `DR-XAI-001` bind the
-reported evidence hashes. No official-test accuracy, confidence interval,
-p-value or XAI stability result has been produced.
+reported evidence hashes. Official baseline predictions have now been produced;
+no official confidence interval, hypothesis-test p-value or XAI stability result
+has yet been finalized.
 
 `DR-SEVERITY-006` binds the approved v6 pilot and four visual-review artifacts.
 Its outcome is `PASS_WITH_DECLARED_OPERATOR_LIMITATION`: severity is ordinal
@@ -108,11 +117,11 @@ rewritten or re-signed. The resulting G1 governance protocol hash is
 
 The remaining work is staged as follows:
 
-1. Run and preserve the metadata-only G2 runtime-authorization verification.
-2. Review that verification artifact, then run one baseline pass for each
-   approved checkpoint in distinct immutable output directories.
-3. Run the registered joint prediction/XAI campaign with identical frozen
-   identities and preserve all provenance, exclusion and retry records.
+1. Run six resumable joint parts (two models x three declared CAM methods).
+2. Merge each model only after exact 1,693 x 12 x 3 coverage and child-artifact
+   verification pass.
+3. Compute the predeclared leaf-cluster statistics and generate report tables;
+   do not use these official-test results for any reselection or tuning.
 
 Severity pilot v1 passed its original numerical gate but failed human visual
 review because brightness and rotation direction, and the Gaussian base-noise

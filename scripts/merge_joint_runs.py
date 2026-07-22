@@ -1,0 +1,266 @@
+"""Merge the three completed method parts for one official-test model."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from plantxai_stability.artifacts import atomic_json
+from plantxai_stability.config import load_protocol
+from plantxai_stability.provenance import sha256_file
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--protocol", type=Path, required=True)
+    parser.add_argument("--baseline-report", type=Path, required=True)
+    parser.add_argument("--part-dir", type=Path, action="append", required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args()
+    if args.output_dir.exists():
+        raise SystemExit("Merged output exists; use a new immutable directory")
+
+    resolved = load_protocol(args.protocol)
+    declared_methods = list(resolved.values["xai"]["methods"])
+    if len(args.part_dir) != len(declared_methods):
+        raise SystemExit(
+            f"Expected {len(declared_methods)} --part-dir values, got {len(args.part_dir)}"
+        )
+    baseline = json.loads(args.baseline_report.read_text(encoding="utf-8"))
+    if baseline.get("run_type") != "authorized_official_test_baseline":
+        raise SystemExit("Baseline report is not an authorized official result")
+    if baseline.get("official_test_result") is not True:
+        raise SystemExit("Baseline report does not contain an official result")
+
+    parts = [_load_part(path) for path in args.part_dir]
+    methods = [part["report"]["run_identity"]["xai_method"] for part in parts]
+    if sorted(methods) != sorted(declared_methods) or len(set(methods)) != len(methods):
+        raise SystemExit("Joint parts do not cover the three declared XAI methods exactly")
+
+    reference_identity = parts[0]["report"]["run_identity"]
+    shared_identity_keys = (
+        "schema_version",
+        "model_id",
+        "campaign_id",
+        "authorization_decision_id",
+        "seed",
+        "scenario_ids",
+        "scenario_count",
+        "sample_count",
+        "sample_ids_sha256",
+        "governance_protocol_hash",
+        "checkpoint_training_protocol_hash",
+        "checkpoint_sha256",
+        "manifest_sha256",
+        "freeze_record_sha256",
+        "checkpoint_decision_record_sha256",
+        "test_decision_record_sha256",
+        "g2_readiness_report_sha256",
+        "transformation_algorithm_version",
+        "xai_policy",
+        "software_version",
+        "git_commit",
+        "runtime_identity",
+    )
+    for part in parts[1:]:
+        identity = part["report"]["run_identity"]
+        mismatches = [
+            key
+            for key in shared_identity_keys
+            if identity.get(key) != reference_identity.get(key)
+        ]
+        if mismatches:
+            raise SystemExit(f"Joint part lineage mismatch: {mismatches}")
+    if reference_identity["governance_protocol_hash"] != resolved.sha256:
+        raise SystemExit("Joint parts do not match the current frozen governance protocol")
+    _validate_baseline_binding(baseline, reference_identity)
+
+    reference_predictions = _prediction_payload(parts[0]["predictions"])
+    for part in parts[1:]:
+        if _prediction_payload(part["predictions"]) != reference_predictions:
+            raise SystemExit("Prediction results diverge across method-specific parts")
+
+    merged_predictions = [dict(row) for row in parts[0]["predictions"]]
+    for row in merged_predictions:
+        row["source_part_run_id"] = row["run_id"]
+        row["run_id"] = args.run_id
+    merged_joint: list[dict[str, str]] = []
+    for part in parts:
+        for source_row in part["joint"]:
+            row = dict(source_row)
+            row["source_part_run_id"] = row["run_id"]
+            row["run_id"] = args.run_id
+            merged_joint.append(row)
+    merged_predictions.sort(key=lambda row: (row["sample_id"], row["scenario_id"]))
+    merged_joint.sort(
+        key=lambda row: (row["sample_id"], row["scenario_id"], row["xai_method"])
+    )
+
+    sample_count = int(reference_identity["sample_count"])
+    scenario_ids = list(reference_identity["scenario_ids"])
+    expected_prediction_count = sample_count * len(scenario_ids)
+    expected_joint_count = expected_prediction_count * len(declared_methods)
+    prediction_keys = {
+        (row["sample_id"], row["scenario_id"]) for row in merged_predictions
+    }
+    joint_keys = {
+        (row["sample_id"], row["scenario_id"], row["xai_method"])
+        for row in merged_joint
+    }
+    criteria = {
+        "baseline_binding_matches": True,
+        "all_declared_methods_present": sorted(methods) == sorted(declared_methods),
+        "child_artifact_hashes_match": True,
+        "child_runs_complete": True,
+        "shared_lineage_exact": True,
+        "predictions_identical_across_method_parts": True,
+        "prediction_factorial_coverage_exact": (
+            len(merged_predictions) == expected_prediction_count
+            and len(prediction_keys) == expected_prediction_count
+        ),
+        "joint_factorial_coverage_exact": (
+            len(merged_joint) == expected_joint_count
+            and len(joint_keys) == expected_joint_count
+        ),
+        "official_test_identity_matches": (
+            baseline.get("official_test_identity")
+            == parts[0]["report"].get("official_test_identity")
+        ),
+        "immutable_output_directory": True,
+    }
+    if not all(criteria.values()):
+        failed = sorted(key for key, value in criteria.items() if not value)
+        raise SystemExit(f"Merged joint coverage gate failed: {failed}")
+
+    args.output_dir.mkdir(parents=True, exist_ok=False)
+    predictions_path = args.output_dir / "prediction_results.csv"
+    joint_path = args.output_dir / "joint_results.csv"
+    report_path = args.output_dir / "joint_merge_report.json"
+    _write_csv_atomic(predictions_path, merged_predictions)
+    _write_csv_atomic(joint_path, merged_joint)
+    report = {
+        "run_type": "authorized_official_test_joint_merged",
+        "official_test_result": True,
+        "run_id": args.run_id,
+        "model_id": reference_identity["model_id"],
+        "campaign_id": reference_identity["campaign_id"],
+        "governance_protocol_hash": reference_identity["governance_protocol_hash"],
+        "checkpoint_training_protocol_hash": reference_identity[
+            "checkpoint_training_protocol_hash"
+        ],
+        "checkpoint_sha256": reference_identity["checkpoint_sha256"],
+        "manifest_sha256": reference_identity["manifest_sha256"],
+        "freeze_record_sha256": reference_identity["freeze_record_sha256"],
+        "official_test_identity": baseline["official_test_identity"],
+        "scenario_ids": scenario_ids,
+        "xai_methods": declared_methods,
+        "prediction_row_count": len(merged_predictions),
+        "joint_row_count": len(merged_joint),
+        "successful_joint_metric_count": sum(
+            not row["exclusion_reason"] for row in merged_joint
+        ),
+        "excluded_joint_metric_count": sum(
+            bool(row["exclusion_reason"]) for row in merged_joint
+        ),
+        "baseline_report_sha256": sha256_file(args.baseline_report),
+        "source_parts": [
+            {
+                "directory": str(part["path"]),
+                "xai_method": part["report"]["run_identity"]["xai_method"],
+                "run_id": part["report"]["run_identity"]["run_id"],
+                "joint_run_report_sha256": sha256_file(
+                    part["path"] / "joint_run_report.json"
+                ),
+            }
+            for part in parts
+        ],
+        "artifact_sha256": {
+            predictions_path.name: sha256_file(predictions_path),
+            joint_path.name: sha256_file(joint_path),
+        },
+        "acceptance_criteria": criteria,
+    }
+    atomic_json(report_path, report)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    print(f"Official joint merge: PASS\nReport: {report_path}")
+    print(f"Report SHA-256: {sha256_file(report_path)}")
+    return 0
+
+
+def _load_part(path: Path) -> dict[str, Any]:
+    report_path = path / "joint_run_report.json"
+    state_path = path / "run_state.json"
+    predictions_path = path / "prediction_results.csv"
+    joint_path = path / "joint_results.csv"
+    required = (report_path, state_path, predictions_path, joint_path)
+    missing = [item.name for item in required if not item.is_file()]
+    if missing:
+        raise SystemExit(f"Joint part {path} is missing artifacts: {missing}")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    if report.get("run_type") != "authorized_official_test_joint_part":
+        raise SystemExit(f"Unexpected joint part type: {path}")
+    if report.get("official_test_result") is not True or state.get("status") != "complete":
+        raise SystemExit(f"Joint part is not complete: {path}")
+    if state.get("run_identity") != report.get("run_identity"):
+        raise SystemExit(f"Joint part state/report identity mismatch: {path}")
+    for name, expected_hash in report.get("artifact_sha256", {}).items():
+        artifact = path / name
+        if not artifact.is_file() or sha256_file(artifact) != expected_hash:
+            raise SystemExit(f"Joint part artifact hash mismatch: {artifact}")
+    return {
+        "path": path,
+        "report": report,
+        "predictions": _read_csv(predictions_path),
+        "joint": _read_csv(joint_path),
+    }
+
+
+def _validate_baseline_binding(
+    baseline: dict[str, Any], identity: dict[str, Any]
+) -> None:
+    expected = {
+        "model_id": identity["model_id"],
+        "campaign_id": identity["campaign_id"],
+        "governance_protocol_hash": identity["governance_protocol_hash"],
+        "checkpoint_training_protocol_hash": identity[
+            "checkpoint_training_protocol_hash"
+        ],
+        "checkpoint_sha256": identity["checkpoint_sha256"],
+        "manifest_sha256": identity["manifest_sha256"],
+        "freeze_record_sha256": identity["freeze_record_sha256"],
+    }
+    mismatches = [
+        key for key, value in expected.items() if baseline.get(key) != value
+    ]
+    if mismatches:
+        raise SystemExit(f"Baseline/joint lineage mismatch: {mismatches}")
+
+
+def _prediction_payload(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [{key: value for key, value in row.items() if key != "run_id"} for row in rows]
+
+
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open("r", newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _write_csv_atomic(path: Path, rows: list[dict[str, str]]) -> None:
+    if not rows:
+        raise ValueError(f"Cannot write empty CSV: {path}")
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    os.replace(temporary, path)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

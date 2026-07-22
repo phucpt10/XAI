@@ -103,24 +103,56 @@ class CAMGenerator:
         self.model = model
         self.target_layer = target_layer
         self.method = method
+        self._active_algorithm: Any = None
+
+    def __enter__(self) -> "CAMGenerator":
+        if self._active_algorithm is not None:
+            raise RuntimeError("CAM generator context is already active")
+        self._active_algorithm = self._build_algorithm()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        algorithm = self._active_algorithm
+        self._active_algorithm = None
+        if algorithm is not None and hasattr(algorithm, "__exit__"):
+            algorithm.__exit__(None, None, None)
 
     def generate(self, input_tensor: Any, target_class: int) -> np.ndarray:
         if target_class < 0:
             raise ValueError("target_class must be non-negative")
         try:
-            from pytorch_grad_cam import GradCAM, GradCAMPlusPlus, ScoreCAM
             from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("Install the optional 'xai' dependencies to generate CAMs") from exc
-        algorithms = {"grad_cam": GradCAM, "grad_cam_plus_plus": GradCAMPlusPlus, "score_cam": ScoreCAM}
-        if self.method not in algorithms:
-            raise ValueError(f"Unsupported XAI method: {self.method}")
-        algorithm = algorithms[self.method](model=self.model, target_layers=[self.target_layer])
+        algorithm = self._active_algorithm or self._build_algorithm()
+        owns_algorithm = self._active_algorithm is None
         try:
             values = algorithm(input_tensor=input_tensor, targets=[ClassifierOutputTarget(target_class)])[0]
         finally:
-            algorithm.__exit__(None, None, None) if hasattr(algorithm, "__exit__") else None
+            if owns_algorithm and hasattr(algorithm, "__exit__"):
+                algorithm.__exit__(None, None, None)
         normalized, quality = normalize_heatmap(values)
         if not quality.valid:
             raise ValueError(f"Invalid heatmap: {quality.reason}")
         return normalized
+
+    def _build_algorithm(self) -> Any:
+        try:
+            from pytorch_grad_cam import GradCAM, GradCAMPlusPlus, ScoreCAM
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "Install the optional 'xai' dependencies to generate CAMs"
+            ) from exc
+        algorithms = {
+            "grad_cam": GradCAM,
+            "grad_cam_plus_plus": GradCAMPlusPlus,
+            "score_cam": ScoreCAM,
+        }
+        if self.method not in algorithms:
+            raise ValueError(f"Unsupported XAI method: {self.method}")
+        return algorithms[self.method](
+            model=self.model, target_layers=[self.target_layer]
+        )

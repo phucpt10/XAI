@@ -46,6 +46,12 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
   test identities without decoding test images or computing test results.
 - Approved `DR-TEST-001` registered-campaign authorization plus a metadata-only
   runtime verification command required before any official-test runner.
+- Transactional official joint runner split by model and CAM method. It commits
+  a complete 12-scenario result per sample to SQLite, cryptographically binds
+  resume attempts to the identical protocol/checkpoint/manifest/code identity,
+  caches each original CAM once per method and preserves explicit exclusions.
+- Fail-closed joint merger that requires exact prediction agreement across the
+  three method parts and complete sample x scenario x method coverage.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.
@@ -64,9 +70,9 @@ python -m plantxai_stability.cli smoke configs/protocol/v0.9/protocol.yaml
 ```
 
 Official training additionally requires a frozen dataset record whose protocol
-hash exactly matches its training protocol. G2 is approved, but baseline and
-joint runners also require the exact readiness report and both Decision Records;
-a boolean protocol flag alone cannot authorize pixel access.
+hash exactly matches its training protocol. G2 is approved; baseline and joint
+runners still require the exact readiness report and both Decision Records. A
+boolean protocol flag alone cannot authorize pixel access.
 
 ## Official-run prerequisites
 
