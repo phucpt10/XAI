@@ -57,6 +57,7 @@ training:
   mixed_precision: true
 
 transformations:
+  algorithm_version: shared_randomization_v2
   names: [rotation, brightness, gaussian_noise, gaussian_blur]
   severities: [mild, moderate, severe]
   materialize_images: false

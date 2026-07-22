@@ -82,3 +82,9 @@ Only two protocol blockers remain:
 2. Train/select and hash validation-approved checkpoints.
 3. Regenerate the final frozen artifact bundle against the final protocol hash.
 4. Freeze the protocol through a reviewed governance change.
+
+Severity pilot v1 passed its original numerical gate but failed human visual
+review because brightness and rotation direction, and the Gaussian base-noise
+field, were independently resampled at each severity. `DR-SEVERITY-001`
+permanently rejects that run. The protocol now pins `shared_randomization_v2`;
+pilot and visual-review evidence must be regenerated in new v2 directories.

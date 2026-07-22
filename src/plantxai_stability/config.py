@@ -92,6 +92,9 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         for model_id in values["models"]
     ):
         raise ValueError("Every model requires a runtime-approved XAI target layer")
+    transformations = values["transformations"]
+    if transformations.get("algorithm_version") != "shared_randomization_v2":
+        raise ValueError("Unsupported transformation algorithm version")
     stats = values["statistics"]
     if stats.get("bootstrap_unit") != "leaf_id":
         raise ValueError("statistics.bootstrap_unit must be leaf_id")

@@ -26,6 +26,8 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Leaf-safe split validation and train/validation grouping.
 - Identity-preserving dataset adapter and optional PyTorch DataLoader.
 - Deterministic rotation, brightness, Gaussian noise and Gaussian blur transformations.
+- Shared-randomization transformation algorithm: each sample keeps the same
+  brightness/rotation direction or base noise field across severity levels.
 - Validation-only, leaf-balanced image-space severity pilot with immutable
   per-sample metrics and an explicit human-approval gate.
 - Optional PyTorch model wrappers for ResNet50 and EfficientNet-B0.

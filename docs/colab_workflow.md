@@ -177,12 +177,17 @@ per declared class, and computes image-space MAE, RMSE, PSNR and SSIM for all
 twelve scenarios. It never loads a model or accesses the official test split.
 Use a new immutable output directory for each attempt:
 
+Pilot v1 is permanently rejected by `DR-SEVERITY-001`: it independently drew
+brightness/rotation direction and Gaussian noise at every severity. The pinned
+`shared_randomization_v2` algorithm holds those nuisance variables fixed while
+only perturbation magnitude changes.
+
 ```python
 !python scripts/pilot_transform_severity.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --output-dir /content/plantxai-severity-pilot-v1 \
+  --output-dir /content/plantxai-severity-pilot-v2 \
   --max-leaves-per-class 50 \
   --minimum-leaves-per-class 20
 ```
@@ -201,8 +206,8 @@ verifies the pilot artifact hashes before producing four contact sheets:
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --pilot-summary /content/plantxai-severity-pilot-v1/severity_pilot_summary.json \
-  --output-dir /content/plantxai-severity-review-v1
+  --pilot-summary /content/plantxai-severity-pilot-v2/severity_pilot_summary.json \
+  --output-dir /content/plantxai-severity-review-v2
 ```
 
 ## 6. Train and preserve checkpoints

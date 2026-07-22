@@ -25,6 +25,7 @@ from plantxai_stability.severity import (
     summarize_pilot_rows,
 )
 from plantxai_stability.transformations import TransformationPipeline, scenario_grid
+from plantxai_stability.transformations import TRANSFORMATION_ALGORITHM_VERSION
 
 
 def main() -> int:
@@ -109,6 +110,13 @@ def main() -> int:
             )
     summary = summarize_pilot_rows(rows)
     selected_ids = [record.sample_id for record in selected]
+    randomization_seeds: dict[tuple[str, str], set[int]] = {}
+    for row in rows:
+        key = (str(row["sample_id"]), str(row["transformation"]))
+        randomization_seeds.setdefault(key, set()).add(int(row["derived_seed"]))
+    shared_randomization_seed_consistent = all(
+        len(seeds) == 1 for seeds in randomization_seeds.values()
+    )
     technical_gate_passed = bool(
         len(selected) == len(set(selected_ids))
         and all(record.split == "validation" for record in selected)
@@ -116,6 +124,7 @@ def main() -> int:
         and summary["all_metrics_finite"]
         and summary["ordinal_gate_passed"]
         and deterministic_recheck_passed
+        and shared_randomization_seed_consistent
     )
     args.output_dir.mkdir(parents=True, exist_ok=False)
     records_path = args.output_dir / "severity_pilot_records.parquet"
@@ -131,6 +140,7 @@ def main() -> int:
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "protocol_version": resolved.values["protocol_version"],
         "protocol_hash": resolved.sha256,
+        "transformation_algorithm_version": TRANSFORMATION_ALGORITHM_VERSION,
         "frozen_manifest_sha256": sha256_file(args.manifest),
         "freeze_record_protocol_hash": freeze_record.get("protocol_hash"),
         "freeze_protocol_hash_matches_current": (
@@ -151,6 +161,7 @@ def main() -> int:
             json.dumps(selected_ids, separators=(",", ":")).encode("utf-8")
         ),
         "deterministic_recheck_passed": deterministic_recheck_passed,
+        "shared_randomization_seed_consistent": shared_randomization_seed_consistent,
         "summary": summary,
         "acceptance_criteria": {
             "validation_only": True,
@@ -162,6 +173,9 @@ def main() -> int:
                 "ordinal_gate_passed"
             ],
             "deterministic_recheck_passed": deterministic_recheck_passed,
+            "shared_randomization_seed_consistent": (
+                shared_randomization_seed_consistent
+            ),
         },
         "technical_gate_passed": technical_gate_passed,
         "decision": (

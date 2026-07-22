@@ -83,8 +83,9 @@
     "transformations": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["names", "severities", "materialize_images", "deterministic_per_sample_seed", "record_exact_parameters", "parameters"],
+      "required": ["algorithm_version", "names", "severities", "materialize_images", "deterministic_per_sample_seed", "record_exact_parameters", "parameters"],
       "properties": {
+        "algorithm_version": {"const": "shared_randomization_v2"},
         "names": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "severities": {"type": "array", "items": {"enum": ["mild", "moderate", "severe"]}},
         "materialize_images": {"type": "boolean"},

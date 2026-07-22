@@ -17,7 +17,11 @@ from plantxai_stability.config import load_protocol
 from plantxai_stability.data.loader import load_verified_record
 from plantxai_stability.data.manifest import read_manifest_csv
 from plantxai_stability.provenance import sha256_file
-from plantxai_stability.transformations import TransformationPipeline, scenario_grid
+from plantxai_stability.transformations import (
+    TRANSFORMATION_ALGORITHM_VERSION,
+    TransformationPipeline,
+    scenario_grid,
+)
 
 
 def main() -> int:
@@ -34,6 +38,8 @@ def main() -> int:
     summary = json.loads(args.pilot_summary.read_text(encoding="utf-8"))
     if not summary.get("technical_gate_passed", False):
         raise SystemExit("Visual review requires a passing severity pilot")
+    if summary.get("transformation_algorithm_version") != TRANSFORMATION_ALGORITHM_VERSION:
+        raise SystemExit("Severity pilot used an obsolete transformation algorithm")
     if summary.get("test_split_accessed") is not False:
         raise SystemExit("Severity pilot does not prove validation-only access")
     pilot_root = args.pilot_summary.parent
@@ -85,6 +91,7 @@ def main() -> int:
         "approval_status": "pending_project_owner_review",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "protocol_hash": resolved.sha256,
+        "transformation_algorithm_version": TRANSFORMATION_ALGORITHM_VERSION,
         "pilot_summary_sha256": sha256_file(args.pilot_summary),
         "pilot_selection_sha256": sha256_file(selection_path),
         "source_split": "validation",

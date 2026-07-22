@@ -11,6 +11,9 @@ import numpy as np
 from plantxai_stability.contracts import TransformationRecord
 
 
+TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_v2"
+
+
 def derive_seed(global_seed: int, sample_id: str, scenario_id: str) -> int:
     digest = hashlib.sha256(f"{global_seed}:{sample_id}:{scenario_id}".encode()).digest()
     return int.from_bytes(digest[:8], "big") % (2**32)
@@ -32,9 +35,12 @@ class TransformationPipeline:
     def apply(self, pixels: np.ndarray, sample_id: str, scenario: Scenario) -> tuple[np.ndarray, TransformationRecord]:
         if pixels.dtype.kind not in "fc" or pixels.ndim != 3 or pixels.shape[-1] != 3:
             raise ValueError("Expected an HWC floating RGB array")
-        seed = derive_seed(self.global_seed, sample_id, scenario.scenario_id)
+        # The stochastic nuisance realization is shared across severity levels.
+        # This isolates severity magnitude from direction/noise resampling.
+        seed = derive_seed(self.global_seed, sample_id, scenario.transformation)
         rng = np.random.default_rng(seed)
         params = dict(scenario.parameters)
+        params["randomization_scope"] = "sample_transformation_shared_across_severity"
         inverse: dict[str, Any] = {"kind": "identity"}
         output = np.clip(pixels.astype(np.float32, copy=True), 0.0, 1.0)
         if scenario.transformation == "brightness":
@@ -42,7 +48,9 @@ class TransformationPipeline:
             output = np.clip(output * (1.0 + direction * float(params["factor"])), 0.0, 1.0)
             params["direction"] = direction
         elif scenario.transformation == "gaussian_noise":
-            output = np.clip(output + rng.normal(float(params.get("mean", 0.0)), float(params["sigma"]), output.shape), 0.0, 1.0).astype(np.float32)
+            standard_noise = rng.normal(0.0, 1.0, output.shape)
+            noise = float(params.get("mean", 0.0)) + float(params["sigma"]) * standard_noise
+            output = np.clip(output + noise, 0.0, 1.0).astype(np.float32)
         elif scenario.transformation == "gaussian_blur":
             output = self._blur(output, int(params["kernel_size"]), float(params.get("sigma", 1.0)))
         elif scenario.transformation == "rotation":
