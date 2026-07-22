@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+*.log
+
+# Dataset and run artifacts never belong in normal Git history.
+data/raw/
+data/cache/
+outputs/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# Local notebooks and Colab caches.
+.ipynb_checkpoints/
+.colab_cache/
+
+# Local Git metadata workaround for managed workspaces where .git is read-only.
+.gitmeta/

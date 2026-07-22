@@ -1,0 +1,170 @@
+{
+  "input": "D:\\ResearchCode\\XAI\\Template_DacTa_ResearchSoftware.docx",
+  "fonts_by_char_count": {
+    "Consolas": 1923
+  },
+  "direct_run_formatting_runs": 95,
+  "direct_paragraph_formatting_paragraphs": 7,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 168,
+      "text": "Kh\u00eda c\u1ea1nh",
+      "style": "Normal"
+    },
+    {
+      "para_index": 169,
+      "text": "Software Engineering",
+      "style": "Normal"
+    },
+    {
+      "para_index": 170,
+      "text": "Research Software Engineering",
+      "style": "Normal"
+    },
+    {
+      "para_index": 186,
+      "text": "Ph\u1ea7n",
+      "style": "Normal"
+    },
+    {
+      "para_index": 187,
+      "text": "T\u00ean",
+      "style": "Normal"
+    },
+    {
+      "para_index": 188,
+      "text": "N\u1ed9i dung",
+      "style": "Normal"
+    },
+    {
+      "para_index": 219,
+      "text": "RQ ID",
+      "style": "Normal"
+    },
+    {
+      "para_index": 220,
+      "text": "C\u00e2u h\u1ecfi",
+      "style": "Normal"
+    },
+    {
+      "para_index": 221,
+      "text": "Module tr\u1ea3 l\u1eddi",
+      "style": "Normal"
+    },
+    {
+      "para_index": 222,
+      "text": "Output artifact",
+      "style": "Normal"
+    },
+    {
+      "para_index": 235,
+      "text": "Layer",
+      "style": "Normal"
+    },
+    {
+      "para_index": 236,
+      "text": "Technology",
+      "style": "Normal"
+    },
+    {
+      "para_index": 237,
+      "text": "Version",
+      "style": "Normal"
+    },
+    {
+      "para_index": 238,
+      "text": "L\u00fd do ch\u1ecdn",
+      "style": "Normal"
+    },
+    {
+      "para_index": 255,
+      "text": "T\u00ean",
+      "style": "Normal"
+    },
+    {
+      "para_index": 256,
+      "text": "Ki\u1ec3u",
+      "style": "Normal"
+    },
+    {
+      "para_index": 257,
+      "text": "Ngu\u1ed3n",
+      "style": "Normal"
+    },
+    {
+      "para_index": 258,
+      "text": "M\u00f4 t\u1ea3",
+      "style": "Normal"
+    },
+    {
+      "para_index": 267,
+      "text": "T\u00ean",
+      "style": "Normal"
+    },
+    {
+      "para_index": 268,
+      "text": "Ki\u1ec3u",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "Research Software Engineering Specification Template\nD\u00e0nh cho Research Software ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "run_text": "Phi\u00ean b\u1ea3n: 1.0\n",
+        "style": "Normal"
+      },
+      {
+        "para_index": 6,
+        "run_text": "TRI\u1ebeT L\u00dd THI\u1ebeT K\u1ebe",
+        "style": "Heading 1"
+      },
+      {
+        "para_index": 10,
+        "run_text": "C\u1ea4U TR\u00daC TEMPLATE (10 PH\u1ea6N)",
+        "style": "Heading 1"
+      },
+      {
+        "para_index": 13,
+        "run_text": "PH\u1ea6N A: RESEARCH CONTEXT",
+        "style": "Heading 1"
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 52,
+        "text": "[Input] \u2192 [Module A] \u2192 [Module B] \u2192 [Output]\n              \u2193            \u2193\n          [Artifact 1] [Artifact 2]",
+        "style": "Normal"
+      },
+      {
+        "para_index": 58,
+        "text": "project/\n\u251c\u2500\u2500 configs/        # Frozen protocol configs\n\u251c\u2500\u2500 src/            # Source code\n\u251c\u2500\u2500 scripts/        # Utility s",
+        "style": "Normal"
+      },
+      {
+        "para_index": 70,
+        "text": "def process(inputs):\n    # B\u01b0\u1edbc 1: ...\n    # B\u01b0\u1edbc 2: ...\n    # B\u01b0\u1edbc 3: ...\n    return output",
+        "style": "Normal"
+      },
+      {
+        "para_index": 82,
+        "text": "@dataclass(frozen=True)\nclass SampleRecord:\n    sample_id: str          # Deterministic ID\n    class_name: str         #",
+        "style": "Normal"
+      },
+      {
+        "para_index": 119,
+        "text": "        /\\\n       /  \\      Scientific Tests (5-10%)\n      / SI \\     \u2192 Verify scientific invariants\n     /------\\\n    /",
+        "style": "Normal"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

@@ -1,0 +1,20 @@
+decision_id: DR-CLASS-001
+title: Five-class tomato scope for PlantXAI-Stability
+status: draft
+selected_classes:
+  - Tomato___healthy
+  - Tomato___Bacterial_spot
+  - Tomato___Early_blight
+  - Tomato___Late_blight
+  - Tomato___Septoria_leaf_spot
+rationale: >-
+  Restrict the study to the five tomato categories required by the approved
+  research questions and keep the class vocabulary fixed before model training.
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+selection_used_official_test_performance: false
+audit_identity: pending
+approved_by: pending
+approved_at_utc: pending
+notes: >-
+  This record must be reviewed and set to approved before an official manifest
+  can be frozen. A draft record is not evidence of approval.
