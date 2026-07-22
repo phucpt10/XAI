@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -72,7 +73,7 @@ def main() -> int:
         args.dataset_id,
         args.configuration,
         args.revision,
-        selected_classes=args.classes if args.manifest else None,
+        selected_classes=args.classes or None,
         prepare_images=args.manifest,
         cache_dir=args.cache_dir,
         token=os.getenv("HF_TOKEN"),
@@ -105,6 +106,38 @@ def main() -> int:
         str(name): getattr(split, "_fingerprint", None) for name, split in dataset.items()
     }
     counts = split_counts(dataset)
+    class_counts_by_split = {
+        str(name): dict(sorted(Counter(str(row["label"]) for row in split).items()))
+        for name, split in dataset.items()
+    }
+    unresolved_leaf_id_count_by_split = {
+        str(name): sum(row.get("leaf_id") in (None, "") for row in split)
+        for name, split in dataset.items()
+    }
+    unresolved_leaf_id_count_by_class_and_split = {
+        str(name): dict(
+            sorted(
+                Counter(
+                    str(row["label"])
+                    for row in split
+                    if row.get("leaf_id") in (None, "")
+                ).items()
+            )
+        )
+        for name, split in dataset.items()
+    }
+    unique_leaf_count_by_split = {
+        str(name): len(
+            {str(row["leaf_id"]) for row in split if row.get("leaf_id") not in (None, "")}
+        )
+        for name, split in dataset.items()
+    }
+    report["class_counts_by_split"] = class_counts_by_split
+    report["unresolved_leaf_id_count_by_split"] = unresolved_leaf_id_count_by_split
+    report["unresolved_leaf_id_count_by_class_and_split"] = (
+        unresolved_leaf_id_count_by_class_and_split
+    )
+    report["unique_leaf_count_by_split"] = unique_leaf_count_by_split
     receipt = {
         "repository": args.dataset_id,
         "dataset_configuration": args.configuration,
@@ -115,6 +148,12 @@ def main() -> int:
         "source_split_names": list(schema.splits),
         "sample_count": sum(counts.values()),
         "source_split_counts": counts,
+        "class_counts_by_split": class_counts_by_split,
+        "unresolved_leaf_id_count_by_split": unresolved_leaf_id_count_by_split,
+        "unresolved_leaf_id_count_by_class_and_split": (
+            unresolved_leaf_id_count_by_class_and_split
+        ),
+        "unique_leaf_count_by_split": unique_leaf_count_by_split,
         "cache_or_storage_location": getattr(dataset, "cache_location", str(args.cache_dir)),
         "source_file_sha256": getattr(dataset, "source_file_sha256", {}),
         "retrieval_timestamp_utc": datetime.now(timezone.utc).isoformat(),
