@@ -103,9 +103,9 @@ def main() -> int:
         "review_questions": [
             "Does each severity preserve recognizable leaf and disease evidence?",
             "Are mild, moderate and severe visually ordered within each transformation?",
-            "Does Telea introduce seams, smearing or synthetic leaf tissue?",
-            "Do inpainted corners contain repeated foreground structures?",
-            "Does synthesized content remain background-like as severity increases?",
+            "Are zero-filled corners treated as invalid support rather than image content?",
+            "Is the invalid-support fraction visibly ordered by rotation severity?",
+            "Are rotation prediction claims explicitly operator-specific?",
             "Should severity labels be restricted to within-transformation comparisons?",
         ],
         "artifact_sha256": {path.name: sha256_file(path) for path in sheet_paths},

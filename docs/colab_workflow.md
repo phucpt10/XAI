@@ -183,19 +183,19 @@ v2 algorithm fixed that error, but `DR-SEVERITY-002` rejects its constant-black
 rotation fill as a severity-correlated shortcut. `DR-SEVERITY-003` rejects the
 v3 border-median fill because it still creates severity-correlated uniform
 polygons. `DR-SEVERITY-004` rejects v4 because reflect padding repeats leaf
-fragments at the image borders. The pinned
-`shared_randomization_telea_inpainting_v5` candidate derives its mask from
-rotation geometry and completes only that region with CPU OpenCV Telea. It
-records all synthesized pixels, mask/output hashes, OpenCV version and requires
-human review; it must be described as rotation with Telea inpainting, not pure
-rotation.
+fragments at the image borders. `DR-SEVERITY-005` rejects the visually smeared
+Telea v5 output and approves v6: deterministic zero-filled rotation plus a
+geometric valid-region mask for XAI comparison. Prediction claims are specific
+to the zero-filled operator. Explanation-stability claims use forward CAM
+alignment, masked Pearson/SSIM, primary top-0.2 IoU and sensitivity checks at
+0.1 and 0.3. M_T denotes valid image support, not leaf segmentation.
 
 ```python
 !python scripts/pilot_transform_severity.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --output-dir /content/plantxai-severity-pilot-v5 \
+  --output-dir /content/plantxai-severity-pilot-v6 \
   --max-leaves-per-class 50 \
   --minimum-leaves-per-class 20
 ```
@@ -206,6 +206,12 @@ increasing median RMSE from mild to moderate to severe for each transformation.
 The report remains `pending_human_review`; it must not change the protocol or
 remove the severity blocker automatically.
 
+Black corners are an intentional, declared part of the v6 image operator and
+are not by themselves a visual-review failure. They remain in model input, so
+prediction robustness is reported only for the zero-filled operator. The CAM
+comparison gate separately verifies and excludes their geometric support using
+M_T; visual review must not describe M_T as a leaf or lesion mask.
+
 Render one deterministic validation example per class for human review. This
 verifies the pilot artifact hashes before producing four contact sheets:
 
@@ -214,8 +220,8 @@ verifies the pilot artifact hashes before producing four contact sheets:
   --protocol configs/protocol/v0.9/protocol.yaml \
   --manifest /content/plantxai-frozen-v1/dataset_manifest.csv \
   --image-root /content/plantxai-manifest-v2 \
-  --pilot-summary /content/plantxai-severity-pilot-v5/severity_pilot_summary.json \
-  --output-dir /content/plantxai-severity-review-v5
+  --pilot-summary /content/plantxai-severity-pilot-v6/severity_pilot_summary.json \
+  --output-dir /content/plantxai-severity-review-v6
 ```
 
 ## 6. Train and preserve checkpoints

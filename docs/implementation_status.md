@@ -1,6 +1,6 @@
 # Implementation and experiment readiness
 
-Date: 2026-07-22
+Date: 2026-07-23
 
 ## Implemented
 
@@ -46,7 +46,7 @@ Date: 2026-07-22
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (35 tests; torch integration skipped when unavailable)
+pytest                          PASS (41 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -96,6 +96,10 @@ pilot v2 corrected shared randomization, but its rotation contact sheet exposed
 severity-correlated black corners. `DR-SEVERITY-002` rejects the complete v2
 set. The v3 border-median replacement still produced uniform corner polygons;
 `DR-SEVERITY-003` rejects that run. V4 removed uniform fill but repeated leaf
-fragments through reflection, so `DR-SEVERITY-004` rejects it. The protocol now
-pins validation-only candidate `shared_randomization_telea_inpainting_v5`;
-pilot and visual-review evidence must be regenerated in new v5 directories.
+fragments through reflection, so `DR-SEVERITY-004` rejects it. Telea v5 passed
+technical checks but produced severity-correlated radial smearing.
+`DR-SEVERITY-005` replaces it with
+`shared_randomization_zero_fill_valid_mask_v6`. Rotation prediction results are
+operator-specific; explanation stability uses forward alignment and geometric
+M_T with masked Pearson/SSIM and top-k IoU. Evidence must be regenerated in new
+v6 directories.

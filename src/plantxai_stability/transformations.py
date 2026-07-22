@@ -1,4 +1,4 @@
-"""Deterministic image transformations and inverse metadata."""
+"""Deterministic image transformations with alignment metadata."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import numpy as np
 from plantxai_stability.contracts import TransformationRecord
 
 
-TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_telea_inpainting_v5"
+TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_zero_fill_valid_mask_v6"
 
 
 def derive_seed(global_seed: int, sample_id: str, scenario_id: str) -> int:
@@ -42,6 +42,7 @@ class TransformationPipeline:
         rng = np.random.default_rng(seed)
         params = dict(scenario.parameters)
         params["randomization_scope"] = "sample_transformation_shared_across_severity"
+        forward: dict[str, Any] = {"kind": "identity"}
         inverse: dict[str, Any] = {"kind": "identity"}
         output = np.clip(pixels.astype(np.float32, copy=True), 0.0, 1.0)
         if scenario.transformation == "brightness":
@@ -58,17 +59,21 @@ class TransformationPipeline:
             angle = float(params["angle_degrees"])
             direction = -1.0 if int(rng.integers(0, 2)) == 0 else 1.0
             angle *= direction
-            if params.get("completion_method") != "opencv_telea":
-                raise ValueError("Rotation requires completion_method=opencv_telea")
-            radius = float(params.get("inpaint_radius", 3.0))
-            dilation = int(params.get("mask_dilation_pixels", 1))
+            if params.get("fill_policy") != "constant_zero":
+                raise ValueError("Rotation requires fill_policy=constant_zero")
+            validity_threshold = float(params.get("validity_threshold", 0.999999))
             expected_opencv = str(params["opencv_distribution_version"])
-            output, completion, valid_mask_sha256 = self._rotate_telea_inpaint(
-                output, angle, radius, dilation, expected_opencv
+            output, rotation_metadata, valid_mask_sha256 = self._rotate_zero_fill(
+                output, angle, validity_threshold, expected_opencv
             )
+            forward = {
+                "kind": "rotation",
+                "angle_degrees": angle,
+                "validity_threshold": validity_threshold,
+            }
             inverse = {"kind": "rotation", "angle_degrees": -angle}
             params["angle_degrees"] = angle
-            params.update(completion)
+            params.update(rotation_metadata)
         else:
             raise ValueError(f"Unsupported transformation: {scenario.transformation}")
         record = TransformationRecord(
@@ -78,6 +83,7 @@ class TransformationPipeline:
             scenario.severity,
             seed,
             params,
+            forward,
             inverse,
             valid_mask_sha256 if scenario.transformation == "rotation" else None,
         )
@@ -96,17 +102,16 @@ class TransformationPipeline:
         return np.asarray(blurred, dtype=np.float32) / 255.0
 
     @staticmethod
-    def _rotate_telea_inpaint(
+    def _rotate_zero_fill(
         pixels: np.ndarray,
         angle: float,
-        radius: float,
-        dilation_pixels: int,
+        validity_threshold: float,
         expected_opencv_distribution_version: str,
     ) -> tuple[np.ndarray, dict[str, Any], str]:
         try:
             import cv2
         except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("OpenCV is required for Telea rotation completion") from exc
+            raise RuntimeError("OpenCV is required for zero-fill rotation") from exc
         distribution_version = version("opencv-python-headless")
         if distribution_version != expected_opencv_distribution_version:
             raise ValueError(
@@ -114,10 +119,8 @@ class TransformationPipeline:
                 f"expected {expected_opencv_distribution_version}, "
                 f"found {distribution_version}"
             )
-        if not 0.0 < radius <= 10.0:
-            raise ValueError("inpaint_radius must be in (0, 10]")
-        if not 0 <= dilation_pixels <= 5:
-            raise ValueError("mask_dilation_pixels must be in [0, 5]")
+        if not 0.99 <= validity_threshold <= 1.0:
+            raise ValueError("validity_threshold must be in [0.99, 1.0]")
         cv2.setNumThreads(1)
         if hasattr(cv2, "ocl"):
             cv2.ocl.setUseOpenCL(False)
@@ -133,56 +136,40 @@ class TransformationPipeline:
             borderMode=cv2.BORDER_CONSTANT,
             borderValue=(0.0, 0.0, 0.0),
         )
-        rotated_validity = cv2.warpAffine(
-            np.full((height, width), 255, dtype=np.uint8),
+        warped_validity = cv2.warpAffine(
+            np.ones((height, width), dtype=np.float32),
             matrix,
             (width, height),
-            flags=cv2.INTER_NEAREST,
+            flags=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
-            borderValue=0,
+            borderValue=0.0,
         )
-        geometric_mask = np.where(rotated_validity == 0, 255, 0).astype(np.uint8)
-        invalid_pixel_count = int(np.count_nonzero(geometric_mask))
+        valid_mask = np.asarray(
+            warped_validity >= validity_threshold, dtype=np.uint8
+        )
+        valid_pixel_count = int(np.count_nonzero(valid_mask))
+        invalid_pixel_count = int(height * width - valid_pixel_count)
         if invalid_pixel_count == 0:
-            raise ValueError("Rotation produced no geometric completion region")
-        inpaint_mask = np.asarray(geometric_mask, dtype=np.uint8)
-        if dilation_pixels:
-            size = 2 * dilation_pixels + 1
-            kernel = np.ones((size, size), dtype=np.uint8)
-            inpaint_mask = np.asarray(
-                cv2.dilate(inpaint_mask, kernel, iterations=1), dtype=np.uint8
-            )
-        completed = cv2.inpaint(
-            rotated,
-            inpaint_mask,
-            inpaintRadius=radius,
-            flags=cv2.INPAINT_TELEA,
-        )
-        known = inpaint_mask == 0
-        known_pixel_change_count = int(
-            np.count_nonzero(np.any(completed[known] != rotated[known], axis=1))
-        )
-        if known_pixel_change_count:
-            raise ValueError("Telea changed pixels outside the declared inpaint mask")
-        inpainted_pixel_count = int(np.count_nonzero(inpaint_mask))
-        mask_sha256 = hashlib.sha256(inpaint_mask.tobytes()).hexdigest()
-        valid_mask_sha256 = hashlib.sha256((inpaint_mask == 0).tobytes()).hexdigest()
-        completion = {
-            "rotation_completion_method": "opencv_telea",
+            raise ValueError("Rotation produced no invalid support region")
+        valid_mask_sha256 = hashlib.sha256(valid_mask.tobytes()).hexdigest()
+        metadata = {
+            "rotation_fill_policy": "constant_zero",
+            "valid_region_policy": "geometric_support_mask",
+            "validity_threshold": validity_threshold,
             "opencv_version": str(cv2.__version__),
             "opencv_distribution_version": distribution_version,
             "opencv_num_threads": int(cv2.getNumThreads()),
             "opencv_opencl_enabled": bool(
                 cv2.ocl.useOpenCL() if hasattr(cv2, "ocl") else False
             ),
-            "geometric_invalid_pixel_count": invalid_pixel_count,
-            "inpainted_pixel_count": inpainted_pixel_count,
-            "inpainted_fraction": inpainted_pixel_count / float(height * width),
-            "inpaint_mask_sha256": mask_sha256,
-            "known_pixel_change_count": known_pixel_change_count,
-            "inpainted_output_rgb_sha256": hashlib.sha256(completed.tobytes()).hexdigest(),
+            "valid_pixel_count": valid_pixel_count,
+            "valid_pixel_fraction": valid_pixel_count / float(height * width),
+            "invalid_pixel_count": invalid_pixel_count,
+            "invalid_pixel_fraction": invalid_pixel_count / float(height * width),
+            "valid_mask_sha256": valid_mask_sha256,
+            "rotated_output_rgb_sha256": hashlib.sha256(rotated.tobytes()).hexdigest(),
         }
-        return completed.astype(np.float32) / 255.0, completion, valid_mask_sha256
+        return rotated.astype(np.float32) / 255.0, metadata, valid_mask_sha256
 
 
 def scenario_grid(parameter_config: dict[str, Any]) -> list[Scenario]:

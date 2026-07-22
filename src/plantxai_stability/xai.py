@@ -50,6 +50,54 @@ def inverse_align_heatmap(heatmap: np.ndarray, inverse_metadata: dict[str, Any])
     return aligned, mask
 
 
+def forward_align_heatmap(
+    heatmap: np.ndarray,
+    forward_metadata: dict[str, Any],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Align an original CAM into the transformed frame and return M_T."""
+    array = np.asarray(heatmap, dtype=np.float32)
+    if array.ndim != 2 or not np.isfinite(array).all():
+        raise ValueError("Forward alignment requires a finite 2D heatmap")
+    kind = forward_metadata.get("kind", "identity")
+    if kind == "identity":
+        return array.copy(), np.ones(array.shape, dtype=bool)
+    if kind != "rotation":
+        raise ValueError(f"Unsupported forward alignment: {kind}")
+    try:
+        import cv2
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("OpenCV is required for forward CAM alignment") from exc
+    cv2.setNumThreads(1)
+    if hasattr(cv2, "ocl"):
+        cv2.ocl.setUseOpenCL(False)
+    height, width = array.shape
+    center = ((width - 1) / 2.0, (height - 1) / 2.0)
+    matrix = cv2.getRotationMatrix2D(
+        center, float(forward_metadata["angle_degrees"]), 1.0
+    )
+    aligned = cv2.warpAffine(
+        array,
+        matrix,
+        (width, height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0.0,
+    )
+    warped_validity = cv2.warpAffine(
+        np.ones((height, width), dtype=np.float32),
+        matrix,
+        (width, height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0.0,
+    )
+    threshold = float(forward_metadata.get("validity_threshold", 0.999999))
+    mask = np.asarray(warped_validity >= threshold, dtype=bool)
+    if not mask.any():
+        raise ValueError("Forward alignment produced an empty valid-region mask")
+    return np.asarray(aligned, dtype=np.float32), mask
+
+
 class CAMGenerator:
     def __init__(self, model: Any, target_layer: Any, method: str) -> None:
         self.model = model

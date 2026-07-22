@@ -104,7 +104,7 @@
       "additionalProperties": false,
       "required": ["algorithm_version", "names", "severities", "materialize_images", "deterministic_per_sample_seed", "record_exact_parameters", "parameters"],
       "properties": {
-          "algorithm_version": {"const": "shared_randomization_telea_inpainting_v5"},
+          "algorithm_version": {"const": "shared_randomization_zero_fill_valid_mask_v6"},
         "names": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "severities": {"type": "array", "items": {"enum": ["mild", "moderate", "severe"]}},
         "materialize_images": {"type": "boolean"},
@@ -116,7 +116,7 @@
     "xai": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["methods", "target_layer_decision_record", "target_layers"],
+      "required": ["methods", "target_layer_decision_record", "target_layers", "alignment_policy", "valid_region_policy", "validity_threshold", "ssim_window_size", "topk_iou_primary", "topk_iou_sensitivity", "target_class_policy", "prediction_consistency_required", "rotation_prediction_claim_scope"],
       "properties": {
         "methods": {"type": "array", "items": {"type": "string"}},
         "target_layer_decision_record": {"type": "string"},
@@ -130,7 +130,16 @@
           }
         },
         "heatmap_epsilon": {"type": "number", "exclusiveMinimum": 0},
-        "constant_heatmap_policy": {"type": "string"}
+        "constant_heatmap_policy": {"type": "string"},
+        "alignment_policy": {"const": "forward_align_original_cam"},
+        "valid_region_policy": {"const": "geometric_support_mask"},
+        "validity_threshold": {"type": "number", "minimum": 0.99, "maximum": 1.0},
+        "ssim_window_size": {"type": "integer", "minimum": 3},
+        "topk_iou_primary": {"const": 0.2},
+        "topk_iou_sensitivity": {"type": "array", "items": {"type": "number"}},
+        "target_class_policy": {"const": "original_predicted_class"},
+        "prediction_consistency_required": {"const": true},
+        "rotation_prediction_claim_scope": {"const": "zero_filled_operator_specific"}
       }
     },
     "statistics": {

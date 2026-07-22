@@ -45,9 +45,8 @@ def test_rotation_direction_is_shared_across_severity() -> None:
             name,
             {
                 "angle_degrees": angle,
-                "completion_method": "opencv_telea",
-                "inpaint_radius": 3.0,
-                "mask_dilation_pixels": 1,
+                "fill_policy": "constant_zero",
+                "validity_threshold": 0.999999,
                 "opencv_distribution_version": "4.13.0.92",
             },
         )
@@ -57,15 +56,12 @@ def test_rotation_direction_is_shared_across_severity() -> None:
     signed_angles = [float(record.parameters["angle_degrees"]) for record in records]
     assert all(angle > 0 for angle in signed_angles) or all(angle < 0 for angle in signed_angles)
     assert [abs(angle) for angle in signed_angles] == [10.0, 25.0, 45.0]
-    fractions = [float(record.parameters["inpainted_fraction"]) for record in records]
+    fractions = [float(record.parameters["invalid_pixel_fraction"]) for record in records]
     assert fractions[0] < fractions[1] < fractions[2]
-    assert all(
-        record.parameters["known_pixel_change_count"] == 0
-        for record in records
-    )
+    assert all(record.forward_metadata["kind"] == "rotation" for record in records)
 
 
-def test_rotation_telea_uses_geometric_mask_and_preserves_known_pixels() -> None:
+def test_rotation_zero_fill_uses_a_geometric_valid_region_mask() -> None:
     ramp = np.linspace(0.4, 0.8, 32, dtype=np.float32)
     pixels = np.repeat(ramp[None, :, None], 32, axis=0)
     pixels = np.repeat(pixels, 3, axis=2)
@@ -76,9 +72,8 @@ def test_rotation_telea_uses_geometric_mask_and_preserves_known_pixels() -> None
         "mild",
         {
             "angle_degrees": 10.0,
-            "completion_method": "opencv_telea",
-            "inpaint_radius": 3.0,
-            "mask_dilation_pixels": 1,
+            "fill_policy": "constant_zero",
+            "validity_threshold": 0.999999,
             "opencv_distribution_version": "4.13.0.92",
         },
     )
@@ -89,45 +84,47 @@ def test_rotation_telea_uses_geometric_mask_and_preserves_known_pixels() -> None
     assert output.shape == pixels.shape
     assert np.array_equal(output, repeated)
     assert record == repeated_record
-    assert record.parameters["rotation_completion_method"] == "opencv_telea"
-    assert record.parameters["known_pixel_change_count"] == 0
-    assert record.parameters["inpainted_pixel_count"] >= record.parameters[
-        "geometric_invalid_pixel_count"
-    ]
-    assert len(record.parameters["inpaint_mask_sha256"]) == 64
+    assert record.parameters["rotation_fill_policy"] == "constant_zero"
+    assert record.parameters["valid_region_policy"] == "geometric_support_mask"
+    assert record.parameters["valid_pixel_count"] > 0
+    assert record.parameters["invalid_pixel_count"] > 0
+    assert len(record.parameters["valid_mask_sha256"]) == 64
     assert len(record.valid_mask_sha256 or "") == 64
-    assert float(output.min()) > 0.0
+    assert float(output.min()) == 0.0
 
 
-def test_rotation_telea_does_not_treat_real_black_pixels_as_missing() -> None:
-    pixels = np.full((32, 32, 3), 0.6, dtype=np.float32)
-    pixels[10:22, 10:22] = 0.0
+def test_rotation_valid_mask_does_not_depend_on_real_black_pixels() -> None:
+    light = np.full((32, 32, 3), 0.6, dtype=np.float32)
+    black_center = light.copy()
+    black_center[10:22, 10:22] = 0.0
     scenario = Scenario(
         "rotation_mild",
         "rotation",
         "mild",
         {
             "angle_degrees": 10.0,
-            "completion_method": "opencv_telea",
-            "inpaint_radius": 3.0,
-            "mask_dilation_pixels": 1,
+            "fill_policy": "constant_zero",
+            "validity_threshold": 0.999999,
             "opencv_distribution_version": "4.13.0.92",
         },
     )
-    output, _ = TransformationPipeline(42, {}).apply(pixels, "pv_black", scenario)
+    _, light_record = TransformationPipeline(42, {}).apply(light, "pv_a", scenario)
+    output, black_record = TransformationPipeline(42, {}).apply(
+        black_center, "pv_a", scenario
+    )
+    assert light_record.valid_mask_sha256 == black_record.valid_mask_sha256
     assert int(np.count_nonzero(np.all(output == 0.0, axis=2))) > 0
 
 
-def test_rotation_telea_fails_on_opencv_version_mismatch() -> None:
+def test_rotation_zero_fill_fails_on_opencv_version_mismatch() -> None:
     scenario = Scenario(
         "rotation_mild",
         "rotation",
         "mild",
         {
             "angle_degrees": 10.0,
-            "completion_method": "opencv_telea",
-            "inpaint_radius": 3.0,
-            "mask_dilation_pixels": 1,
+            "fill_policy": "constant_zero",
+            "validity_threshold": 0.999999,
             "opencv_distribution_version": "0.0.0",
         },
     )

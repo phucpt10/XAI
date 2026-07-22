@@ -18,11 +18,25 @@ from plantxai_stability.data.loader import load_verified_record, preprocess_for_
 from plantxai_stability.data.manifest import read_manifest_csv
 from plantxai_stability.inference import infer_one
 from plantxai_stability.models import ModelWrapper
-from plantxai_stability.provenance import RunContext, sha256_file
+from plantxai_stability.provenance import RunContext, sha256_bytes, sha256_file
 from plantxai_stability.statistics import heatmap_metrics
 from plantxai_stability.training import load_checkpoint
 from plantxai_stability.transformations import TransformationPipeline, scenario_grid
-from plantxai_stability.xai import CAMGenerator, inverse_align_heatmap, normalize_heatmap
+from plantxai_stability.xai import CAMGenerator, forward_align_heatmap
+
+
+METRIC_FIELDS = (
+    "ssim",
+    "pearson",
+    "cosine",
+    "topk_iou_10",
+    "topk_iou_20",
+    "topk_iou_30",
+    "valid_pixel_count",
+    "valid_pixel_fraction",
+    "ssim_valid_pixel_count",
+    "ssim_valid_pixel_fraction",
+)
 
 
 def main() -> int:
@@ -62,6 +76,7 @@ def main() -> int:
     pipeline = TransformationPipeline(resolved.seed, resolved.values["transformations"]["parameters"])
     scenarios = scenario_grid(resolved.values["transformations"]["parameters"])
     methods = resolved.values["xai"]["methods"]
+    xai_policy = resolved.values["xai"]
     checkpoint_hash = sha256_file(args.checkpoint)
     original_cache = {}
     prediction_rows = []
@@ -75,27 +90,39 @@ def main() -> int:
             transformed_pixels, transformation_record = pipeline.apply(original_pixels, record.sample_id, scenario)
             transformed_prediction = infer_one(model, transformed_pixels, record, args.model_id, args.run_id, scenario.scenario_id, checkpoint_hash, args.device)
             consistent = original_prediction.predicted_class == transformed_prediction.predicted_class
-            prediction_rows.append({**asdict(original_prediction), "transformed_predicted_class": transformed_prediction.predicted_class, "transformed_confidence": transformed_prediction.confidence, "is_consistent": consistent, "confidence_delta": transformed_prediction.confidence - original_prediction.confidence, "absolute_confidence_delta": abs(transformed_prediction.confidence - original_prediction.confidence), "transformation": scenario.transformation, "severity": scenario.severity})
+            prediction_rows.append({**asdict(original_prediction), "transformed_predicted_class": transformed_prediction.predicted_class, "transformed_confidence": transformed_prediction.confidence, "is_consistent": consistent, "confidence_delta": transformed_prediction.confidence - original_prediction.confidence, "absolute_confidence_delta": abs(transformed_prediction.confidence - original_prediction.confidence), "transformation": scenario.transformation, "severity": scenario.severity, "rotation_prediction_claim_scope": xai_policy["rotation_prediction_claim_scope"] if scenario.transformation == "rotation" else "not_applicable", "valid_mask_sha256": transformation_record.valid_mask_sha256 or ""})
             if not consistent:
-                joint_rows.append({"run_id": args.run_id, "model_id": args.model_id, "sample_id": record.sample_id, "leaf_id": record.leaf_id, "scenario_id": scenario.scenario_id, "xai_method": "", "target_class": original_prediction.predicted_class, "is_consistent": False, "ssim": "", "pearson": "", "cosine": "", "exclusion_reason": "prediction_inconsistent"})
+                joint_rows.append(_joint_row(args.run_id, args.model_id, record.sample_id, record.leaf_id, scenario.scenario_id, "", original_prediction.predicted_class, False, None, "", "prediction_inconsistent"))
                 continue
             original_tensor = preprocess_for_model(original_pixels).unsqueeze(0).to(args.device)
             transformed_tensor = preprocess_for_model(transformed_pixels).unsqueeze(0).to(args.device)
             for method in methods:
                 generator = CAMGenerator(model, target_layer, method)
-                original_cam = generator.generate(original_tensor, original_prediction.predicted_class)
-                transformed_cam = generator.generate(transformed_tensor, original_prediction.predicted_class)
-                aligned, mask = inverse_align_heatmap(transformed_cam, transformation_record.inverse_metadata)
-                normalized_original, original_quality = normalize_heatmap(original_cam)
-                normalized_aligned, aligned_quality = normalize_heatmap(aligned)
-                if not original_quality.valid or not aligned_quality.valid:
-                    joint_rows.append({"run_id": args.run_id, "model_id": args.model_id, "sample_id": record.sample_id, "leaf_id": record.leaf_id, "scenario_id": scenario.scenario_id, "xai_method": method, "target_class": original_prediction.predicted_class, "is_consistent": True, "ssim": "", "pearson": "", "cosine": "", "exclusion_reason": original_quality.reason or aligned_quality.reason})
+                try:
+                    original_cam = generator.generate(
+                        original_tensor, original_prediction.predicted_class
+                    )
+                    transformed_cam = generator.generate(
+                        transformed_tensor, original_prediction.predicted_class
+                    )
+                    aligned_original, mask = forward_align_heatmap(
+                        original_cam, transformation_record.forward_metadata
+                    )
+                    metrics = heatmap_metrics(
+                        aligned_original,
+                        transformed_cam,
+                        mask,
+                        ssim_window_size=int(xai_policy["ssim_window_size"]),
+                        topk_values=tuple(xai_policy["topk_iou_sensitivity"]),
+                    )
+                    mask_hash = sha256_bytes(mask.astype("uint8").tobytes())
+                except ValueError as exc:
+                    joint_rows.append(_joint_row(args.run_id, args.model_id, record.sample_id, record.leaf_id, scenario.scenario_id, method, original_prediction.predicted_class, True, None, "", f"invalid_cam_or_metric:{exc}"))
                     continue
-                metrics = heatmap_metrics(normalized_original, normalized_aligned, mask)
-                joint_rows.append({"run_id": args.run_id, "model_id": args.model_id, "sample_id": record.sample_id, "leaf_id": record.leaf_id, "scenario_id": scenario.scenario_id, "xai_method": method, "target_class": original_prediction.predicted_class, "is_consistent": True, **metrics, "exclusion_reason": ""})
+                joint_rows.append(_joint_row(args.run_id, args.model_id, record.sample_id, record.leaf_id, scenario.scenario_id, method, original_prediction.predicted_class, True, metrics, mask_hash, ""))
     _write_csv(output / "prediction_results.csv", prediction_rows)
     _write_csv(output / "joint_results.csv", joint_rows)
-    (output / "run_manifest.json").write_text(json.dumps({"context": context.to_dict(), "protocol_hash": resolved.sha256, "manifest": str(args.manifest), "manifest_sha256": sha256_file(args.manifest), "checkpoint": str(args.checkpoint), "checkpoint_sha256": checkpoint_hash, "scenario_count": len(scenarios), "xai_methods": methods, "checkpoint_payload": checkpoint_payload}, indent=2, default=str), encoding="utf-8")
+    (output / "run_manifest.json").write_text(json.dumps({"context": context.to_dict(), "protocol_hash": resolved.sha256, "manifest": str(args.manifest), "manifest_sha256": sha256_file(args.manifest), "checkpoint": str(args.checkpoint), "checkpoint_sha256": checkpoint_hash, "scenario_count": len(scenarios), "xai_methods": methods, "xai_alignment_policy": {key: xai_policy[key] for key in ("alignment_policy", "valid_region_policy", "validity_threshold", "ssim_window_size", "topk_iou_primary", "topk_iou_sensitivity", "target_class_policy", "prediction_consistency_required", "rotation_prediction_claim_scope")}, "checkpoint_payload": checkpoint_payload}, indent=2, default=str), encoding="utf-8")
     print(json.dumps({"run_id": args.run_id, "prediction_rows": len(prediction_rows), "joint_rows": len(joint_rows), "scenario_count": len(scenarios)}, indent=2))
     return 0
 
@@ -108,6 +135,38 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _joint_row(
+    run_id: str,
+    model_id: str,
+    sample_id: str,
+    leaf_id: str,
+    scenario_id: str,
+    method: str,
+    target_class: int,
+    is_consistent: bool,
+    metrics: dict[str, float] | None,
+    valid_mask_sha256: str,
+    exclusion_reason: str,
+) -> dict[str, object]:
+    values: dict[str, object] = {
+        "run_id": run_id,
+        "model_id": model_id,
+        "sample_id": sample_id,
+        "leaf_id": leaf_id,
+        "scenario_id": scenario_id,
+        "xai_method": method,
+        "target_class": target_class,
+        "is_consistent": is_consistent,
+        "alignment_policy": "forward_align_original_cam",
+        "valid_mask_sha256": valid_mask_sha256,
+        "exclusion_reason": exclusion_reason,
+    }
+    values.update(
+        {field: "" if metrics is None else metrics[field] for field in METRIC_FIELDS}
+    )
+    return values
 
 
 if __name__ == "__main__":

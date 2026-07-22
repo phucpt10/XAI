@@ -24,6 +24,13 @@ def test_protocol_is_draft_and_fail_closed() -> None:
         "resnet50": "layer4[-1]",
         "efficientnet_b0": "features[-1]",
     }
+    assert config.values["xai"]["alignment_policy"] == "forward_align_original_cam"
+    assert config.values["xai"]["valid_region_policy"] == "geometric_support_mask"
+    assert config.values["xai"]["topk_iou_sensitivity"] == [0.1, 0.2, 0.3]
+    assert (
+        config.values["xai"]["rotation_prediction_claim_scope"]
+        == "zero_filled_operator_specific"
+    )
     assert len(config.sha256) == 64
 
 

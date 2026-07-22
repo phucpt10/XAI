@@ -41,6 +41,7 @@ class TransformationRecord:
     severity: str
     seed: int
     parameters: dict[str, Any]
+    forward_metadata: dict[str, Any]
     inverse_metadata: dict[str, Any]
     valid_mask_sha256: Optional[str]
 
@@ -58,4 +59,9 @@ class JointRecord:
     ssim: Optional[float]
     pearson: Optional[float]
     cosine: Optional[float]
+    topk_iou_10: Optional[float]
+    topk_iou_20: Optional[float]
+    topk_iou_30: Optional[float]
+    valid_pixel_count: Optional[int]
+    valid_pixel_fraction: Optional[float]
     exclusion_reason: Optional[str]

@@ -1,0 +1,33 @@
+decision_id: DR-SEVERITY-005
+title: Replace Telea completion with zero-fill valid-region XAI evaluation
+status: approved
+decision_type: transformation_and_xai_metric_methodology
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+rejected_pilot:
+  transformation_algorithm_version: shared_randomization_telea_inpainting_v5
+  technical_gate_passed: true
+  test_split_accessed: false
+  submitted_rotation_contact_sheet_sha256: b3cf1b344220862f552577e59a7917a8609fb960dee3ffaee7764de5498d9cc
+  inpainted_fraction:
+    mild: 0.081787109375
+    moderate: 0.150146484375
+    severe: 0.178466796875
+rejection_reason: >-
+  Telea passes deterministic provenance checks but creates visible radial
+  smearing whose area increases with severity.
+approved_method:
+  image_operator: zero_filled_rotation
+  explanation_alignment: forward_align_original_cam
+  comparison_domain: geometric_valid_region_mask
+  primary_metrics: [masked_pearson, masked_ssim, topk_iou_0.2]
+  sensitivity_topk: [0.1, 0.2, 0.3]
+  target_class: original_predicted_class
+  prediction_consistency_required: true
+claim_boundary: >-
+  Explanation-stability claims are restricted to geometrically aligned valid
+  support. Prediction robustness is operator-specific to zero-filled rotation
+  and must not be described as pure rotation invariance. M_T is an image-support
+  mask, not a leaf-segmentation mask.
+approved_by: project_owner
+methodology_reviewed_by: research_methodology_quality_gate
+approved_at_utc: 2026-07-23

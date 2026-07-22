@@ -74,7 +74,7 @@ training:
   deterministic_algorithms: true
 
 transformations:
-  algorithm_version: shared_randomization_telea_inpainting_v5
+  algorithm_version: shared_randomization_zero_fill_valid_mask_v6
   names: [rotation, brightness, gaussian_noise, gaussian_blur]
   severities: [mild, moderate, severe]
   materialize_images: false
@@ -82,9 +82,9 @@ transformations:
   record_exact_parameters: true
   parameters:
     rotation:
-      mild: {angle_degrees: 10.0, completion_method: opencv_telea, inpaint_radius: 3.0, mask_dilation_pixels: 1, interpolation: bilinear, mask_interpolation: nearest, opencv_distribution_version: "4.13.0.92"}
-      moderate: {angle_degrees: 25.0, completion_method: opencv_telea, inpaint_radius: 3.0, mask_dilation_pixels: 1, interpolation: bilinear, mask_interpolation: nearest, opencv_distribution_version: "4.13.0.92"}
-      severe: {angle_degrees: 45.0, completion_method: opencv_telea, inpaint_radius: 3.0, mask_dilation_pixels: 1, interpolation: bilinear, mask_interpolation: nearest, opencv_distribution_version: "4.13.0.92"}
+      mild: {angle_degrees: 10.0, fill_policy: constant_zero, validity_threshold: 0.999999, interpolation: bilinear, mask_interpolation: bilinear, opencv_distribution_version: "4.13.0.92"}
+      moderate: {angle_degrees: 25.0, fill_policy: constant_zero, validity_threshold: 0.999999, interpolation: bilinear, mask_interpolation: bilinear, opencv_distribution_version: "4.13.0.92"}
+      severe: {angle_degrees: 45.0, fill_policy: constant_zero, validity_threshold: 0.999999, interpolation: bilinear, mask_interpolation: bilinear, opencv_distribution_version: "4.13.0.92"}
     brightness:
       mild: {factor: 0.10}
       moderate: {factor: 0.30}
@@ -106,6 +106,15 @@ xai:
     efficientnet_b0: "features[-1]"
   heatmap_epsilon: 1.0e-8
   constant_heatmap_policy: record_nan_with_reason
+  alignment_policy: forward_align_original_cam
+  valid_region_policy: geometric_support_mask
+  validity_threshold: 0.999999
+  ssim_window_size: 7
+  topk_iou_primary: 0.2
+  topk_iou_sensitivity: [0.1, 0.2, 0.3]
+  target_class_policy: original_predicted_class
+  prediction_consistency_required: true
+  rotation_prediction_claim_scope: zero_filled_operator_specific
 
 statistics:
   bootstrap_unit: leaf_id

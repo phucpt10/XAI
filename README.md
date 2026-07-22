@@ -28,9 +28,9 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Deterministic rotation, brightness, Gaussian noise and Gaussian blur transformations.
 - Shared-randomization transformation algorithm: each sample keeps the same
   brightness/rotation direction or base noise field across severity levels.
-- Rotation v5 derives missing pixels from a rotated geometric validity mask and
-  completes only that declared region with deterministic OpenCV Telea
-  inpainting. Synthesized area, masks, runtime version and output are hashed.
+- Rotation v6 uses a declared zero-fill operator and a geometric valid-region
+  mask. Prediction claims are operator-specific; CAM claims use forward
+  alignment and exclude invalid support from every primary XAI metric.
 - Validation-only, leaf-balanced image-space severity pilot with immutable
   per-sample metrics and an explicit human-approval gate.
 - Optional PyTorch model wrappers for ResNet50 and EfficientNet-B0.
@@ -39,14 +39,15 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.
-- Heatmap quality validation, SSIM/Pearson/cosine metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
+- Heatmap quality validation, masked Pearson/SSIM, top-k IoU at 0.1/0.2/0.3,
+  secondary cosine, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Run provenance and artifact index helpers.
 - Unit, integration and scientific invariant tests.
 
 ## Safe commands
 
 ```powershell
-python -m pip install -e ".[hf,dev]"
+python -m pip install -e ".[hf,ml,xai,dev]"
 python -m pytest
 python -m plantxai_stability.cli validate-protocol configs/protocol/v0.9/protocol.yaml
 python -m plantxai_stability.cli smoke configs/protocol/v0.9/protocol.yaml

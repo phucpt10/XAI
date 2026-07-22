@@ -30,4 +30,22 @@ def make_exclusion(pair: dict[str, object], reason: str) -> dict[str, object]:
 
 def make_joint_record(pair: dict[str, object], leaf_id: str, method: str, metrics: dict[str, float] | None, target_class: int, reason: str | None = None) -> JointRecord:
     run_id, model_id, sample_id, scenario_id = cast(tuple[str, str, str, str], pair["key"])
-    return JointRecord(run_id, model_id, sample_id, leaf_id, scenario_id, method, target_class, bool(pair["is_consistent"]), None if metrics is None else metrics.get("ssim"), None if metrics is None else metrics.get("pearson"), None if metrics is None else metrics.get("cosine"), reason)
+    return JointRecord(
+        run_id,
+        model_id,
+        sample_id,
+        leaf_id,
+        scenario_id,
+        method,
+        target_class,
+        bool(pair["is_consistent"]),
+        None if metrics is None else metrics.get("ssim"),
+        None if metrics is None else metrics.get("pearson"),
+        None if metrics is None else metrics.get("cosine"),
+        None if metrics is None else metrics.get("topk_iou_10"),
+        None if metrics is None else metrics.get("topk_iou_20"),
+        None if metrics is None else metrics.get("topk_iou_30"),
+        None if metrics is None else int(metrics["valid_pixel_count"]),
+        None if metrics is None else metrics.get("valid_pixel_fraction"),
+        reason,
+    )

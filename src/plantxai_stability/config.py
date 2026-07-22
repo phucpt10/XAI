@@ -105,9 +105,29 @@ def _validate_protocol(values: dict[str, Any]) -> None:
     transformations = values["transformations"]
     if (
         transformations.get("algorithm_version")
-        != "shared_randomization_telea_inpainting_v5"
+        != "shared_randomization_zero_fill_valid_mask_v6"
     ):
         raise ValueError("Unsupported transformation algorithm version")
+    expected_xai_policy = {
+        "alignment_policy": "forward_align_original_cam",
+        "valid_region_policy": "geometric_support_mask",
+        "target_class_policy": "original_predicted_class",
+        "prediction_consistency_required": True,
+        "rotation_prediction_claim_scope": "zero_filled_operator_specific",
+    }
+    if any(xai.get(key) != value for key, value in expected_xai_policy.items()):
+        raise ValueError("Unsupported XAI alignment or claim policy")
+    if xai.get("topk_iou_primary") != 0.2 or xai.get("topk_iou_sensitivity") != [0.1, 0.2, 0.3]:
+        raise ValueError("Unsupported top-k IoU policy")
+    if xai.get("ssim_window_size") != 7 or xai.get("validity_threshold") != 0.999999:
+        raise ValueError("Unsupported masked SSIM or validity-mask policy")
+    rotation_parameters = transformations.get("parameters", {}).get("rotation", {})
+    if not rotation_parameters or any(
+        parameters.get("fill_policy") != "constant_zero"
+        or parameters.get("validity_threshold") != xai["validity_threshold"]
+        for parameters in rotation_parameters.values()
+    ):
+        raise ValueError("Rotation parameters do not match the XAI valid-region policy")
     training = values["training"]
     if training.get("optimizer") != "adamw":
         raise ValueError("Only the declared AdamW optimizer is allowed")
