@@ -43,6 +43,9 @@ Date: 2026-07-23
 - Approved `DR-CHECKPOINT-001` registry for both predeclared backbones. It binds
   checkpoint, training evidence, validation prediction and metric artifact
   hashes while preserving the immutable G0B training-protocol lineage.
+- Metadata-only G2 readiness report generator. It verifies both checkpoint and
+  validation-audit trees, frozen split invariants and official-test identity
+  counts while guaranteeing that no official-test image is decoded.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
@@ -52,7 +55,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (53 tests; torch integration skipped when unavailable)
+pytest                          PASS (55 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)

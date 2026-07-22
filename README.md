@@ -41,6 +41,9 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
   artifact hashes; official test pixels remain inaccessible before G2.
 - Approved `DR-CHECKPOINT-001` registry for both validation-selected checkpoints,
   preserving their original G0B training lineage while governance advances.
+- Metadata-only G2 readiness gate that reconciles both checkpoint registries,
+  validation audits and all child artifact hashes while enumerating official
+  test identities without decoding test images or computing test results.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.

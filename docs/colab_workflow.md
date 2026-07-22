@@ -371,6 +371,34 @@ When reproducing the audit after G1, add:
 G1 approval does not authorize the next commands. Official test remains
 blocked until a separate G2 Decision Record and final lineage gate pass.
 
+## 7. Prepare metadata-only G2 readiness evidence
+
+This preflight hashes the two checkpoints, their training evidence, both
+validation audit reports and every child audit artifact. It enumerates frozen
+test `sample_id` and `leaf_id` values from the manifest only. It does not build
+a test Dataset/DataLoader, decode test images, run inference or produce a test
+metric. G2 must still be blocked when this command runs.
+
+```python
+!python scripts/prepare_g2_readiness.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/plantxai-frozen-final-v1/dataset_manifest.csv \
+  --checkpoint-decision-record configs/protocol/v0.9/decision_records/DR-CHECKPOINT-001.yaml \
+  --resnet50-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_best.pt \
+  --resnet50-evidence /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_checkpoint_evidence.json \
+  --resnet50-audit-report /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/validation-audit-v1/validation_checkpoint_audit.json \
+  --efficientnet-b0-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/efficientnet_b0_best.pt \
+  --efficientnet-b0-evidence /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/efficientnet_b0_checkpoint_evidence.json \
+  --efficientnet-b0-audit-report /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/validation-audit-v1/validation_checkpoint_audit.json \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/g2-readiness-v1
+```
+
+The report must end with `G2 readiness technical gate: PASS`, retain
+`approval_status: pending_g2_human_review`, state
+`official_test.pixels_accessed: false` and leave both G2 and official-test
+evaluation disabled. Record the separately printed report SHA-256 for the G2
+Decision Record. Do not run baseline or joint evaluation after this preflight.
+
 Baseline test evaluation is a separate step:
 
 ```python
