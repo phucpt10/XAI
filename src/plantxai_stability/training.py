@@ -74,7 +74,12 @@ def train_model(
     patience = int(config.get("early_stopping_patience", 8))
     start_epoch = 0
     if resume:
-        resume_payload = torch.load(latest_checkpoint, map_location=device, weights_only=False)
+        # Training-state checkpoints contain CPU RNG and DataLoader-generator
+        # byte tensors. Loading the whole payload directly onto CUDA changes
+        # their device and makes PyTorch reject them during state restoration.
+        resume_payload = torch.load(
+            latest_checkpoint, map_location="cpu", weights_only=False
+        )
         _validate_resume_payload(resume_payload, model_id, config)
         model.load_state_dict(resume_payload["state_dict"])
         optimizer.load_state_dict(resume_payload["optimizer_state_dict"])
@@ -88,7 +93,11 @@ def train_model(
         _restore_rng_state(resume_payload["rng_state"], torch)
         generator_state = resume_payload.get("train_loader_generator_state")
         if generator_state is not None and getattr(train_loader, "generator", None) is not None:
-            train_loader.generator.set_state(generator_state)
+            train_loader.generator.set_state(
+                _coerce_rng_byte_tensor(
+                    generator_state, torch, "train_loader_generator_state"
+                )
+            )
         print(f"Resuming {model_id} at epoch {start_epoch + 1}")
     max_epochs = int(config.get("max_epochs", 50))
     for epoch in range(start_epoch, max_epochs):
@@ -296,9 +305,32 @@ def _capture_rng_state(torch: Any) -> dict[str, Any]:
 def _restore_rng_state(state: dict[str, Any], torch: Any) -> None:
     random.setstate(state["python"])
     np.random.set_state(state["numpy"])
-    torch.set_rng_state(state["torch_cpu"])
+    torch.set_rng_state(
+        _coerce_rng_byte_tensor(state["torch_cpu"], torch, "torch_cpu")
+    )
     if torch.cuda.is_available() and state.get("torch_cuda"):
-        torch.cuda.set_rng_state_all(state["torch_cuda"])
+        torch.cuda.set_rng_state_all(
+            [
+                _coerce_rng_byte_tensor(value, torch, f"torch_cuda[{index}]")
+                for index, value in enumerate(state["torch_cuda"])
+            ]
+        )
+
+
+def _coerce_rng_byte_tensor(value: Any, torch: Any, field: str) -> Any:
+    """Return a non-empty contiguous CPU uint8 RNG-state tensor."""
+    try:
+        if isinstance(value, torch.Tensor):
+            tensor = value.detach().to(device="cpu", dtype=torch.uint8).contiguous()
+        else:
+            tensor = torch.as_tensor(
+                value, dtype=torch.uint8, device="cpu"
+            ).contiguous()
+    except (TypeError, ValueError, RuntimeError) as exc:
+        raise ValueError(f"Invalid RNG state for {field}") from exc
+    if tensor.ndim != 1 or tensor.numel() == 0:
+        raise ValueError(f"Invalid RNG state shape for {field}")
+    return tensor
 
 
 def _atomic_torch_save(payload: dict[str, Any], path: Path, torch: Any) -> None:

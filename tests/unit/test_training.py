@@ -1,6 +1,9 @@
+import random
+
+import numpy as np
 import pytest
 
-from plantxai_stability.training import _validate_resume_payload
+from plantxai_stability.training import _restore_rng_state, _validate_resume_payload
 
 
 def _config() -> dict[str, object]:
@@ -82,3 +85,58 @@ def test_resume_lineage_rejects_training_config_change() -> None:
     config["learning_rate"] = 0.01
     with pytest.raises(ValueError, match="training_config"):
         _validate_resume_payload(_payload(), "resnet50", config)
+
+
+def test_restore_rng_state_moves_byte_tensors_back_to_cpu() -> None:
+    class FakeTensor:
+        def __init__(self, device: str = "cuda") -> None:
+            self.device = device
+            self.dtype = "uint8"
+            self.ndim = 1
+
+        def detach(self) -> "FakeTensor":
+            return self
+
+        def to(self, *, device: str, dtype: str) -> "FakeTensor":
+            self.device = device
+            self.dtype = dtype
+            return self
+
+        def contiguous(self) -> "FakeTensor":
+            return self
+
+        def numel(self) -> int:
+            return 16
+
+    class FakeCuda:
+        restored: list[FakeTensor] = []
+
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+        @classmethod
+        def set_rng_state_all(cls, values: list[FakeTensor]) -> None:
+            assert all(value.device == "cpu" for value in values)
+            cls.restored = values
+
+    class FakeTorch:
+        Tensor = FakeTensor
+        uint8 = "uint8"
+        cuda = FakeCuda
+        restored: FakeTensor | None = None
+
+        @classmethod
+        def set_rng_state(cls, value: FakeTensor) -> None:
+            assert value.device == "cpu"
+            cls.restored = value
+
+    state = {
+        "python": random.getstate(),
+        "numpy": np.random.get_state(),
+        "torch_cpu": FakeTensor(),
+        "torch_cuda": [FakeTensor()],
+    }
+    _restore_rng_state(state, FakeTorch)
+    assert FakeTorch.restored is not None
+    assert len(FakeCuda.restored) == 1

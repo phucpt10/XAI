@@ -46,7 +46,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (43 tests; torch integration skipped when unavailable)
+pytest                          PASS (44 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
