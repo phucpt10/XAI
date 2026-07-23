@@ -60,6 +60,11 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
 - Metadata-only analysis-support preflight covering all 192 planned model,
   CAM-method and within-transformation severity contrasts without reading
   endpoint metric columns or computing hypothesis tests.
+- Approved `DR-ANALYSIS-SUPPORT-001` conservatively retains one insufficient
+  `Score-CAM x Gaussian blur severe` model contrast as three non-estimable
+  endpoint rows. The fixed 576-row plan and Holm family membership remain
+  intact: 573 rows are estimable and three reserve adjustment-only family
+  slots without reporting p-values or effect sizes.
 - Infrastructure-only physical-freeze recovery governed by `DR-RECOVERY-001`.
   It keeps the historical freeze hash as logical lineage, records the recovered
   physical hash separately, re-verifies every manifest image and prevents
@@ -96,6 +101,7 @@ boolean protocol flag alone cannot authorize pixel access.
 6. Select, audit and approve both model checkpoints using validation only (G1; complete).
 7. Reconcile final lineage and explicitly unlock official test evaluation (G2).
 8. Merge both complete model result trees and run the predeclared
-   `DR-ANALYSIS-001` statistical analysis without reopening image pixels.
+   `DR-ANALYSIS-001` analysis under the support adjudication in
+   `DR-ANALYSIS-SUPPORT-001`, without reopening image pixels.
 
 No dataset count, accuracy, confidence interval, p-value or stability result is fabricated by this repository.

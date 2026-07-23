@@ -32,6 +32,20 @@ EXPECTED_FIXED_ROW_COUNTS = {
     "paired_comparisons.csv": 576,
     "rq3_association_summary.csv": 72,
 }
+EXPECTED_SUPPORT_AUDIT_REPORT_SHA256 = (
+    "f370b3c7ace79cd5523242831593522671844f6459d2fa344f21f829613c13ac"
+)
+EXPECTED_SUPPORT_AUDIT_ARTIFACT_SHA256 = {
+    "exclusion_reason_audit.csv": (
+        "24c1c80790fa4d099705a42f2821b97e9934f9482987ef34ee6888888aa0b4cd"
+    ),
+    "insufficient_common_leaf_contrasts.csv": (
+        "a65b71b8f25bcc3d24218baf16591481b596e708f044d6266c7ebafc08e16c1d"
+    ),
+    "planned_contrast_support_audit.csv": (
+        "cde7a78b6b959813b74d30ede1fd55c242e38dbab81ca68d5c4432bba4248514"
+    ),
+}
 BOOLEAN_COLUMNS = ("is_consistent", "transformed_is_correct", "is_correct")
 PREDICTION_NUMERIC_COLUMNS = (
     "confidence",
@@ -51,6 +65,144 @@ def load_analysis_decision(path: Path) -> dict[str, Any]:
     if payload.get("status") != "approved":
         raise ValueError("DR-ANALYSIS-001 is not approved")
     return payload
+
+
+def load_analysis_support_decision(path: Path) -> dict[str, Any]:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Analysis-support Decision Record must be a YAML mapping")
+    if payload.get("decision_id") != "DR-ANALYSIS-SUPPORT-001":
+        raise ValueError("Expected DR-ANALYSIS-SUPPORT-001")
+    if payload.get("status") != "approved":
+        raise ValueError("DR-ANALYSIS-SUPPORT-001 is not approved")
+    if payload.get("approved_by") != "project_owner":
+        raise ValueError("DR-ANALYSIS-SUPPORT-001 lacks project-owner approval")
+    return payload
+
+
+def validate_analysis_support_authorization(
+    *,
+    support_decision: dict[str, Any],
+    support_decision_path: Path,
+    support_audit_dir: Path,
+    analysis_decision_path: Path,
+) -> dict[str, Any]:
+    source = support_decision.get("source_support_audit", {})
+    report_path = support_audit_dir / "analysis_support_audit_report.json"
+    if not report_path.is_file():
+        raise ValueError(f"Missing support-audit report: {report_path}")
+    if source.get("report_sha256") != EXPECTED_SUPPORT_AUDIT_REPORT_SHA256:
+        raise ValueError("Support Decision Record contains an unapproved audit SHA-256")
+    if sha256_file(report_path) != EXPECTED_SUPPORT_AUDIT_REPORT_SHA256:
+        raise ValueError("Support-audit report SHA-256 mismatch")
+    if source.get("artifact_sha256") != EXPECTED_SUPPORT_AUDIT_ARTIFACT_SHA256:
+        raise ValueError("Support Decision Record artifact hashes are not approved")
+    for name, expected_hash in EXPECTED_SUPPORT_AUDIT_ARTIFACT_SHA256.items():
+        path = support_audit_dir / name
+        if not path.is_file() or sha256_file(path) != expected_hash:
+            raise ValueError(f"Support-audit artifact SHA-256 mismatch: {path}")
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    expected_report_state = {
+        "run_type": "metadata_only_official_analysis_support_audit",
+        "analysis_decision_id": "DR-ANALYSIS-001",
+        "minimum_common_leaf_count": 20,
+        "planned_contrast_count": 192,
+        "insufficient_contrast_count": 1,
+        "all_contrasts_meet_minimum": False,
+        "analysis_execution_allowed_without_adjudication": False,
+        "official_test_pixels_accessed": False,
+        "endpoint_metric_values_read": False,
+        "hypothesis_tests_computed": False,
+    }
+    mismatches = [
+        key for key, value in expected_report_state.items() if report.get(key) != value
+    ]
+    if mismatches or not all(report.get("acceptance_criteria", {}).values()):
+        raise ValueError(f"Support-audit report state mismatch: {mismatches}")
+    if report.get("analysis_decision_record_sha256") != sha256_file(analysis_decision_path):
+        raise ValueError("Support audit does not bind the current analysis Decision Record")
+    if report.get("artifact_sha256") != EXPECTED_SUPPORT_AUDIT_ARTIFACT_SHA256:
+        raise ValueError("Support-audit child artifact registry mismatch")
+
+    exceptions = support_decision.get("non_estimable_contrasts")
+    if not isinstance(exceptions, list) or len(exceptions) != 1:
+        raise ValueError("Exactly one non-estimable contrast must be authorized")
+    exception = exceptions[0]
+    expected_exception = {
+        "support_contrast_id": "rq2_model::score_cam::gaussian_blur_severe",
+        "analysis_contrast_type": "rq2_model",
+        "analysis_contrast": (
+            "resnet50_minus_efficientnet_b0::score_cam::gaussian_blur_severe"
+        ),
+        "endpoints": list(RQ2_PRIMARY),
+        "expected_common_samples": 14,
+        "expected_common_leaves": 12,
+        "minimum_common_leaves": 20,
+        "support_status": "NOT_ESTIMABLE_INSUFFICIENT_COMMON_LEAVES",
+    }
+    if exception != expected_exception:
+        raise ValueError("Non-estimable contrast authorization differs from the approved record")
+
+    insufficient = pd.read_csv(
+        support_audit_dir / "insufficient_common_leaf_contrasts.csv",
+        keep_default_na=False,
+    )
+    if len(insufficient) != 1:
+        raise ValueError("Support audit must contain exactly one insufficient contrast")
+    row = insufficient.iloc[0]
+    observed = {
+        "support_contrast_id": str(row["contrast_id"]),
+        "analysis_contrast_type": str(row["contrast_scope"]),
+        "expected_common_samples": int(row["common_samples"]),
+        "expected_common_leaves": int(row["common_leaves"]),
+        "minimum_common_leaves": int(row["minimum_common_leaves"]),
+        "support_status": str(row["support_status"]),
+    }
+    expected_observed = {
+        key: expected_exception[key]
+        for key in (
+            "support_contrast_id",
+            "analysis_contrast_type",
+            "expected_common_samples",
+            "expected_common_leaves",
+            "minimum_common_leaves",
+            "support_status",
+        )
+    }
+    if observed != expected_observed:
+        raise ValueError("Insufficient-support row differs from the approved exception")
+
+    holm_policy = support_decision.get("holm_family_slot_policy", {})
+    expected_holm_policy = {
+        "preserve_predeclared_family_membership": True,
+        "adjustment_only_reserved_slot_value": 1.0,
+        "report_reserved_slot_as_p_value": False,
+        "non_estimable_rows_reject_h0": False,
+    }
+    if holm_policy != expected_holm_policy:
+        raise ValueError("Holm family-slot policy differs from the approved conservative policy")
+    expected_output_contract = {
+        "planned_paired_rows": 576,
+        "estimable_paired_rows": 573,
+        "non_estimable_paired_rows": 3,
+        "non_estimable_numeric_fields": "empty",
+        "retain_non_estimable_rows_in_paired_comparisons": True,
+    }
+    if support_decision.get("output_contract") != expected_output_contract:
+        raise ValueError("Non-estimable output contract differs from the approved record")
+    constraints = support_decision.get("scientific_constraints", {})
+    if not constraints or not all(constraints.values()):
+        raise ValueError("Analysis-support scientific constraints are incomplete")
+    if support_decision.get("source_analysis_decision_record_sha256") != sha256_file(
+        analysis_decision_path
+    ):
+        raise ValueError("Support Decision Record does not bind DR-ANALYSIS-001")
+    if support_decision.get("decision_record_sha256") not in (None, ""):
+        raise ValueError("Self-referential Decision Record hashes are prohibited")
+    if not support_decision_path.is_file():
+        raise ValueError("Analysis-support Decision Record is missing")
+    return exception
 
 
 def validate_analysis_plan(decision: dict[str, Any], resolved: ResolvedConfig) -> None:
@@ -243,6 +395,7 @@ def paired_comparisons(
     methods: Sequence[str],
     alpha: float,
     minimum_leaf_count: int,
+    non_estimable_authorization: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     scenarios = sorted(predictions["scenario_id"].unique())
@@ -281,6 +434,14 @@ def paired_comparisons(
                         contrast_type="rq2_model",
                         contrast=(f"resnet50_minus_efficientnet_b0::{method}::{scenario}"),
                         minimum_leaf_count=minimum_leaf_count,
+                        non_estimable_authorization=_matching_non_estimable_authorization(
+                            non_estimable_authorization,
+                            contrast_type="rq2_model",
+                            contrast=(
+                                f"resnet50_minus_efficientnet_b0::{method}::{scenario}"
+                            ),
+                            endpoint=endpoint,
+                        ),
                     )
                 )
 
@@ -334,6 +495,23 @@ def paired_comparisons(
                                 minimum_leaf_count=minimum_leaf_count,
                             )
                         )
+    non_estimable_rows = [row for row in rows if row["estimable"] is False]
+    if non_estimable_authorization is None:
+        if non_estimable_rows:
+            raise ValueError("An unapproved non-estimable contrast was produced")
+    else:
+        expected_endpoints = sorted(non_estimable_authorization["endpoints"])
+        if (
+            len(non_estimable_rows) != len(expected_endpoints)
+            or sorted(row["endpoint"] for row in non_estimable_rows) != expected_endpoints
+            or any(
+                row["contrast_type"]
+                != non_estimable_authorization["analysis_contrast_type"]
+                or row["contrast"] != non_estimable_authorization["analysis_contrast"]
+                for row in non_estimable_rows
+            )
+        ):
+            raise ValueError("Non-estimable output rows do not match the approved authorization")
     _apply_holm(rows, alpha)
     return rows
 
@@ -691,6 +869,7 @@ def _paired_contrast(
     contrast_type: str,
     contrast: str,
     minimum_leaf_count: int,
+    non_estimable_authorization: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     left = _filter(frame, left_filter)[["sample_id", "leaf_id", endpoint]]
     right = _filter(frame, right_filter)[["sample_id", "leaf_id", endpoint]]
@@ -706,7 +885,43 @@ def _paired_contrast(
         [f"{endpoint}_left", f"{endpoint}_right"]
     ].mean()
     if len(leaf) < minimum_leaf_count:
-        raise ValueError(f"Paired leaf count below {minimum_leaf_count} for {contrast}")
+        if non_estimable_authorization is None:
+            raise ValueError(f"Paired leaf count below {minimum_leaf_count} for {contrast}")
+        observed = {
+            "analysis_contrast_type": contrast_type,
+            "analysis_contrast": contrast,
+            "expected_common_samples": int(len(paired)),
+            "expected_common_leaves": int(len(leaf)),
+            "minimum_common_leaves": minimum_leaf_count,
+        }
+        expected = {
+            key: non_estimable_authorization[key]
+            for key in (
+                "analysis_contrast_type",
+                "analysis_contrast",
+                "expected_common_samples",
+                "expected_common_leaves",
+                "minimum_common_leaves",
+            )
+        }
+        if observed != expected or endpoint not in non_estimable_authorization["endpoints"]:
+            raise ValueError("Observed insufficient support differs from its authorization")
+        return {
+            "family_id": family_id,
+            "contrast_type": contrast_type,
+            "contrast": contrast,
+            "endpoint": endpoint,
+            "estimable": False,
+            "support_status": non_estimable_authorization["support_status"],
+            "n_common_sample_keys": int(len(paired)),
+            "n_leaf_pairs": int(len(leaf)),
+            "left_mean": "",
+            "right_mean": "",
+            "mean_difference_left_minus_right": "",
+            "wilcoxon_statistic": "",
+            "p_value_raw": "",
+            "rank_biserial": "",
+        }
     left_values = leaf[f"{endpoint}_left"].to_numpy(dtype=float)
     right_values = leaf[f"{endpoint}_right"].to_numpy(dtype=float)
     result = paired_wilcoxon(left_values, right_values)
@@ -715,6 +930,8 @@ def _paired_contrast(
         "contrast_type": contrast_type,
         "contrast": contrast,
         "endpoint": endpoint,
+        "estimable": True,
+        "support_status": "ESTIMABLE",
         "n_common_sample_keys": int(len(paired)),
         "n_leaf_pairs": int(len(leaf)),
         "left_mean": float(left_values.mean()),
@@ -731,11 +948,40 @@ def _apply_holm(rows: list[dict[str, Any]], alpha: float) -> None:
     for row in rows:
         families.setdefault(str(row["family_id"]), []).append(row)
     for family_rows in families.values():
-        adjusted = holm_adjust(row["p_value_raw"] for row in family_rows)
+        adjustment_values = [
+            float(row["p_value_raw"]) if row["estimable"] else 1.0 for row in family_rows
+        ]
+        adjusted = holm_adjust(adjustment_values)
+        estimable_count = sum(bool(row["estimable"]) for row in family_rows)
+        reserved_count = len(family_rows) - estimable_count
         for row, p_value in zip(family_rows, adjusted):
-            row["p_value_holm"] = p_value
-            row["reject_h0_holm"] = bool(p_value <= alpha)
+            row["p_value_holm"] = p_value if row["estimable"] else ""
+            row["reject_h0_holm"] = bool(p_value <= alpha) if row["estimable"] else ""
             row["alpha"] = alpha
+            row["holm_family_size"] = len(family_rows)
+            row["holm_estimable_count"] = estimable_count
+            row["holm_reserved_non_estimable_slots"] = reserved_count
+            row["holm_reserved_slot_value_for_adjustment_only"] = (
+                1.0 if not row["estimable"] else ""
+            )
+
+
+def _matching_non_estimable_authorization(
+    authorization: dict[str, Any] | None,
+    *,
+    contrast_type: str,
+    contrast: str,
+    endpoint: str,
+) -> dict[str, Any] | None:
+    if authorization is None:
+        return None
+    if (
+        authorization["analysis_contrast_type"] == contrast_type
+        and authorization["analysis_contrast"] == contrast
+        and endpoint in authorization["endpoints"]
+    ):
+        return authorization
+    return None
 
 
 def _filter(frame: pd.DataFrame, filters: dict[str, str]) -> pd.DataFrame:

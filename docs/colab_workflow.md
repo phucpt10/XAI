@@ -578,7 +578,7 @@ columns only:
   --analysis-decision-record configs/protocol/v0.9/decision_records/DR-ANALYSIS-001.yaml \
   --resnet50-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/resnet50-joint-merged-v1 \
   --efficientnet-b0-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/efficientnet-b0-joint-merged-v1 \
-  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/analysis-support-audit-v2
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/analysis-support-audit-v4
 ```
 
 The audit must print `Analysis support audit: PASS`. If its final support gate
@@ -586,7 +586,12 @@ is `BLOCKED_PENDING_ADJUDICATION`, preserve the report SHA and both support CSV
 files. Do not lower the minimum leaf count or change a Holm family from the
 not-yet-estimated endpoint values.
 
-After the support audit is resolved through a separate Decision Record, run:
+The approved v4 audit has report SHA
+`f370b3c7ace79cd5523242831593522671844f6459d2fa344f21f829613c13ac`.
+`DR-ANALYSIS-SUPPORT-001` retains its one insufficient cross-model support
+cell as three non-estimable endpoint rows. It does not lower the 20-leaf
+threshold. The fixed output remains 576 rows: 573 estimable and three
+non-estimable. Run:
 
 ```python
 %cd /content/PlantXAI-Stability
@@ -594,9 +599,11 @@ After the support audit is resolved through a separate Decision Record, run:
 !python scripts/analyze_official_results.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
   --analysis-decision-record configs/protocol/v0.9/decision_records/DR-ANALYSIS-001.yaml \
+  --analysis-support-decision-record configs/protocol/v0.9/decision_records/DR-ANALYSIS-SUPPORT-001.yaml \
+  --analysis-support-audit-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/analysis-support-audit-v4 \
   --resnet50-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/resnet50-joint-merged-v1 \
   --efficientnet-b0-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/efficientnet-b0-joint-merged-v1 \
-  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/statistical-analysis-v1
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/statistical-analysis-v2
 ```
 
 The runner must end with `Official statistical analysis: PASS`. Preserve the
@@ -605,6 +612,9 @@ hashes before reading result rows, requires exact factorial coverage, uses
 10,000 `leaf_id` bootstrap replicates, aggregates common sample pairs to the
 leaf level before paired Wilcoxon tests, and applies only the Holm families
 declared in `DR-ANALYSIS-001`.
+The three non-estimable rows have empty inferential fields. Their predeclared
+Holm family positions are reserved conservatively with adjustment-only value
+1.0; that internal value is not a reported p-value or an imputed endpoint.
 
 The six CSV outputs are reporting artifacts, not inputs to any new model,
 transformation, checkpoint or XAI selection. RQ3 associations are explicitly

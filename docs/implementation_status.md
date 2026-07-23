@@ -67,6 +67,12 @@ Date: 2026-07-23
   enforces common paired sample keys, leaf-level inference, 10,000 bootstrap
   replicates, explicit Holm families, immutable outputs and a complete
   exclusion audit.
+- Approved `DR-ANALYSIS-SUPPORT-001` binds metadata-only support audit
+  `f370b3c...13ac`. Of 192 planned support contrasts, 191 meet the 20-leaf
+  threshold. The single `Score-CAM x Gaussian blur severe` cross-model
+  contrast has 14 common samples from 12 leaves and is retained as three
+  non-estimable endpoint rows. The output remains 576 rows (573 estimable,
+  three non-estimable), with conservative reserved Holm family slots.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
 
@@ -129,11 +135,12 @@ configuration to the later G1 governance state; checkpoint files are not
 rewritten or re-signed. The resulting G1 governance protocol hash is
 `88440f4e740a707e128cb80d0680dca4f38c104388f51d9493b5b1adb76affe9`.
 
-The recovery, all six model-method parts and both model merges are complete.
+The recovery, all six model-method parts, both model merges and the
+metadata-only 192-contrast support audit are complete.
 The remaining work is staged as follows:
 
-1. Run the approved `DR-ANALYSIS-001` CPU-only analysis against the exact two
-   merged-report hashes.
+1. Run the approved `DR-ANALYSIS-001` CPU-only analysis with
+   `DR-ANALYSIS-SUPPORT-001` against the exact two merged-report hashes.
 2. Review the resulting acceptance criteria and preserve the analysis-report
    SHA-256 without modifying any statistical family.
 3. Populate the paper tables and figures from the immutable analysis artifacts;

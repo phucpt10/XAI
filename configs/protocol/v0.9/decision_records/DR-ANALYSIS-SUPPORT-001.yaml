@@ -1,0 +1,81 @@
+decision_id: DR-ANALYSIS-SUPPORT-001
+title: Conservative adjudication of one non-estimable official-analysis contrast
+status: approved
+decision_type: official_test_analysis_support_adjudication
+approved_at_utc: 2026-07-24
+approved_by: project_owner
+
+source_analysis_decision_id: DR-ANALYSIS-001
+source_analysis_decision_record_sha256: 44353953fbb98bda42a32514ea9421c6f2d251af5fa6b2ec63b5d4216a80c3bb
+
+source_support_audit:
+  report_sha256: f370b3c7ace79cd5523242831593522671844f6459d2fa344f21f829613c13ac
+  run_type: metadata_only_official_analysis_support_audit
+  planned_contrast_count: 192
+  insufficient_contrast_count: 1
+  minimum_common_leaf_count: 20
+  artifact_sha256:
+    exclusion_reason_audit.csv: 24c1c80790fa4d099705a42f2821b97e9934f9482987ef34ee6888888aa0b4cd
+    insufficient_common_leaf_contrasts.csv: a65b71b8f25bcc3d24218baf16591481b596e708f044d6266c7ebafc08e16c1d
+    planned_contrast_support_audit.csv: cde7a78b6b959813b74d30ede1fd55c242e38dbab81ca68d5c4432bba4248514
+
+non_estimable_contrasts:
+  - support_contrast_id: rq2_model::score_cam::gaussian_blur_severe
+    analysis_contrast_type: rq2_model
+    analysis_contrast: >-
+      resnet50_minus_efficientnet_b0::score_cam::gaussian_blur_severe
+    endpoints:
+      - pearson
+      - ssim
+      - topk_iou_20
+    expected_common_samples: 14
+    expected_common_leaves: 12
+    minimum_common_leaves: 20
+    support_status: NOT_ESTIMABLE_INSUFFICIENT_COMMON_LEAVES
+
+output_contract:
+  planned_paired_rows: 576
+  estimable_paired_rows: 573
+  non_estimable_paired_rows: 3
+  non_estimable_numeric_fields: empty
+  retain_non_estimable_rows_in_paired_comparisons: true
+
+holm_family_slot_policy:
+  preserve_predeclared_family_membership: true
+  adjustment_only_reserved_slot_value: 1.0
+  report_reserved_slot_as_p_value: false
+  non_estimable_rows_reject_h0: false
+
+scientific_constraints:
+  paired_key_remains_sample_id: true
+  inferential_unit_remains_leaf_id: true
+  common_sample_intersection_precedes_leaf_aggregation: true
+  minimum_paired_leaf_count_remains_20: true
+  endpoint_families_unchanged: true
+  imputation_prohibited: true
+  checkpoint_reselection_prohibited: true
+  model_or_hyperparameter_tuning_prohibited: true
+  transformation_tuning_prohibited: true
+  xai_method_tuning_prohibited: true
+  official_test_pixel_access_prohibited: true
+
+decision: >-
+  Retain the single insufficient-support contrast in the fixed output schema as
+  three endpoint-specific non-estimable rows. Do not calculate a Wilcoxon test,
+  effect size, confidence interval or reportable p-value for those rows. Preserve
+  each predeclared Holm family by reserving the non-estimable member with an
+  adjustment-only value of 1.0; this value is not an estimated or reported
+  p-value. Authorize the remaining 573 estimable endpoint-specific comparisons
+  without changing the minimum paired-leaf threshold, endpoints, families,
+  models, transformations or XAI methods.
+
+project_owner_approval: >-
+  Tôi phê duyệt DR-ANALYSIS-SUPPORT-001 dựa trên support audit SHA
+  f370b3c7ace79cd5523242831593522671844f6459d2fa344f21f829613c13ac.
+  Cho phép đánh dấu rq2_model::score_cam::gaussian_blur_severe là
+  NOT_ESTIMABLE_INSUFFICIENT_COMMON_LEAVES, giữ nguyên ngưỡng 20 paired leaves
+  và toàn bộ Holm families đã đăng ký. Ba endpoint-specific rows tương ứng phải
+  được giữ lại dưới dạng non-estimable, không tính kiểm định hay effect size;
+  các family slots được bảo toàn theo cách bảo thủ. Cho phép tiếp tục 573 kiểm
+  định estimable; không thay đổi hoặc tinh chỉnh model, transformation, XAI,
+  endpoint hay protocol dựa trên official-test results.

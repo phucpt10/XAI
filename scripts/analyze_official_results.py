@@ -19,12 +19,14 @@ from plantxai_stability.official_analysis import (
     RQ1_PRIMARY,
     RQ2_PRIMARY,
     load_analysis_decision,
+    load_analysis_support_decision,
     load_and_validate_merges,
     paired_comparisons,
     prediction_summaries,
     records_are_finite,
     rq3_associations,
     validate_analysis_plan,
+    validate_analysis_support_authorization,
     xai_summaries,
 )
 from plantxai_stability.provenance import sha256_file
@@ -34,6 +36,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--protocol", type=Path, required=True)
     parser.add_argument("--analysis-decision-record", type=Path, required=True)
+    parser.add_argument("--analysis-support-decision-record", type=Path, required=True)
+    parser.add_argument("--analysis-support-audit-dir", type=Path, required=True)
     parser.add_argument("--resnet50-merge-dir", type=Path, required=True)
     parser.add_argument("--efficientnet-b0-merge-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -44,6 +48,15 @@ def main() -> int:
     resolved = load_protocol(args.protocol)
     decision = load_analysis_decision(args.analysis_decision_record)
     validate_analysis_plan(decision, resolved)
+    support_decision = load_analysis_support_decision(
+        args.analysis_support_decision_record
+    )
+    non_estimable_authorization = validate_analysis_support_authorization(
+        support_decision=support_decision,
+        support_decision_path=args.analysis_support_decision_record,
+        support_audit_dir=args.analysis_support_audit_dir,
+        analysis_decision_path=args.analysis_decision_record,
+    )
     predictions, joint, reports = load_and_validate_merges(
         merge_dirs={
             "resnet50": args.resnet50_merge_dir,
@@ -75,6 +88,7 @@ def main() -> int:
         methods=resolved.values["xai"]["methods"],
         alpha=float(policy["alpha"]),
         minimum_leaf_count=int(policy["minimum_paired_leaf_count"]),
+        non_estimable_authorization=non_estimable_authorization,
     )
     associations = rq3_associations(
         predictions,
@@ -85,8 +99,12 @@ def main() -> int:
     )
 
     expected_rows = decision["outputs"]["expected_fixed_row_counts"]
+    estimable_comparisons = [row for row in comparisons if row["estimable"] is True]
+    non_estimable_comparisons = [row for row in comparisons if row["estimable"] is False]
     criteria = {
         "analysis_decision_approved": True,
+        "analysis_support_decision_approved": True,
+        "analysis_support_audit_hashes_match": True,
         "source_merge_report_hashes_match": True,
         "source_child_artifact_hashes_match": True,
         "cross_model_lineage_matches": True,
@@ -101,11 +119,40 @@ def main() -> int:
         "paired_family_coverage_exact": (
             len(comparisons) == expected_rows["paired_comparisons.csv"]
         ),
+        "paired_estimable_count_exact": len(estimable_comparisons) == 573,
+        "paired_non_estimable_count_exact": len(non_estimable_comparisons) == 3,
+        "non_estimable_rows_match_approved_exception": all(
+            row["contrast_type"] == non_estimable_authorization["analysis_contrast_type"]
+            and row["contrast"] == non_estimable_authorization["analysis_contrast"]
+            and row["endpoint"] in non_estimable_authorization["endpoints"]
+            and row["support_status"] == non_estimable_authorization["support_status"]
+            and row["n_common_sample_keys"]
+            == non_estimable_authorization["expected_common_samples"]
+            and row["n_leaf_pairs"] == non_estimable_authorization["expected_common_leaves"]
+            and row["p_value_raw"] == ""
+            and row["p_value_holm"] == ""
+            and row["rank_biserial"] == ""
+            for row in non_estimable_comparisons
+        ),
+        "holm_predeclared_family_slots_preserved": all(
+            int(row["holm_estimable_count"])
+            + int(row["holm_reserved_non_estimable_slots"])
+            == int(row["holm_family_size"])
+            for row in comparisons
+        ),
+        "non_estimable_holm_slots_are_conservative": all(
+            row["holm_family_size"] == 12
+            and row["holm_estimable_count"] == 11
+            and row["holm_reserved_non_estimable_slots"] == 1
+            and row["holm_reserved_slot_value_for_adjustment_only"] == 1.0
+            and row["reject_h0_holm"] == ""
+            for row in non_estimable_comparisons
+        ),
         "rq3_coverage_exact": (len(associations) == expected_rows["rq3_association_summary.csv"]),
         "exclusion_audit_reconciles": (
             sum(int(row["row_count"]) for row in exclusion_audit) == len(joint)
         ),
-        "official_test_pixels_accessed": False,
+        "official_test_pixels_not_accessed": True,
         "bootstrap_leaf_unit_enforced": True,
         "paired_common_key_and_leaf_unit_enforced": True,
         "holm_families_predeclared": True,
@@ -115,7 +162,7 @@ def main() -> int:
         and records_are_finite(xai_summary, ("estimate", "lower", "upper"))
         and records_are_finite(associations, ("estimate", "lower", "upper")),
         "comparison_metrics_finite": records_are_finite(
-            comparisons,
+            estimable_comparisons,
             (
                 "left_mean",
                 "right_mean",
@@ -154,6 +201,13 @@ def main() -> int:
         "official_test_pixels_accessed": False,
         "analysis_decision_id": decision["decision_id"],
         "analysis_decision_record_sha256": sha256_file(args.analysis_decision_record),
+        "analysis_support_decision_id": support_decision["decision_id"],
+        "analysis_support_decision_record_sha256": sha256_file(
+            args.analysis_support_decision_record
+        ),
+        "analysis_support_audit_report_sha256": support_decision[
+            "source_support_audit"
+        ]["report_sha256"],
         "campaign_id": decision["scientific_lineage"]["campaign_id"],
         "governance_protocol_hash": resolved.sha256,
         "source_merge_report_sha256": {
@@ -167,6 +221,9 @@ def main() -> int:
         "analysis_scope": decision["analysis_scope"],
         "endpoint_policy": decision["endpoints"],
         "holm_family_policy": decision["holm_families"],
+        "holm_non_estimable_family_slot_policy": support_decision[
+            "holm_family_slot_policy"
+        ],
         "row_counts": {
             "source_prediction_rows": int(len(predictions)),
             "source_joint_rows": int(len(joint)),
@@ -175,6 +232,8 @@ def main() -> int:
             "xai_summary_rows": len(xai_summary),
             "xai_exclusion_audit_rows": len(exclusion_audit),
             "paired_comparison_rows": len(comparisons),
+            "paired_estimable_rows": len(estimable_comparisons),
+            "paired_non_estimable_rows": len(non_estimable_comparisons),
             "rq3_association_rows": len(associations),
         },
         "primary_endpoints": {
@@ -188,6 +247,8 @@ def main() -> int:
             "rotation_prediction_claim_is_zero_fill_operator_specific": True,
             "xai_uses_forward_alignment_and_valid_region": True,
             "rq3_is_exploratory_without_hypothesis_testing": True,
+            "non_estimable_rows_are_not_interpreted_as_null_results": True,
+            "minimum_paired_leaf_threshold_remains_20": True,
             "test_results_must_not_drive_reselection_or_tuning": True,
         },
         "runtime": {
