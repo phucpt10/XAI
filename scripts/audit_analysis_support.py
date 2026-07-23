@@ -96,9 +96,9 @@ def main() -> int:
         "exclusion_audit_reconciles": (
             sum(int(row["row_count"]) for row in exclusions) == len(joint)
         ),
-        "official_test_pixels_accessed": False,
-        "endpoint_metric_values_read": False,
-        "hypothesis_tests_computed": False,
+        "official_test_pixels_not_accessed": True,
+        "endpoint_metric_values_not_read": True,
+        "hypothesis_tests_not_computed": True,
     }
     if not all(criteria.values()):
         failed = sorted(key for key, value in criteria.items() if not value)
