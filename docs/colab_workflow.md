@@ -620,7 +620,38 @@ The six CSV outputs are reporting artifacts, not inputs to any new model,
 transformation, checkpoint or XAI selection. RQ3 associations are explicitly
 exploratory and have no hypothesis tests.
 
-## 9. Export results
+## 9. Generate frozen tables, figures and summaries
+
+Proceed only with the verified `statistical-analysis-v2` report SHA
+`68a9b47fddb2f203aa35a78645849f4e15c11379dbba6dfc79c9a188557294de`.
+This stage is CPU-only. It reads only the frozen JSON/CSV analysis artifacts;
+it does not accept an image root, checkpoint or GPU device and cannot recompute
+predictions, CAMs or statistical tests.
+
+```python
+%cd /content/PlantXAI-Stability
+
+!python -m pip install -e ".[report]"
+
+!python scripts/generate_frozen_results_report.py \
+  --results-decision-record configs/protocol/v0.9/decision_records/DR-RESULTS-001.yaml \
+  --analysis-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/statistical-analysis-v2 \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/frozen-results-reporting-v1
+```
+
+The command must end with `Frozen results reporting: PASS`. Preserve the
+printed report SHA-256. It verifies the official analysis report and all six
+child hashes before reading any row, requires the frozen row counts, and writes
+only the exact output allowlist registered in `DR-RESULTS-001`.
+
+The three cross-model `Score-CAM x Gaussian blur severe` rows for Pearson,
+SSIM and top-20% IoU remain `NOT_ESTIMABLE_INSUFFICIENT_COMMON_LEAVES`. They
+must be reported as unavailable under the registered 20-leaf support rule, not
+as statistically non-significant results. RQ3 remains exploratory; severity is
+ordinal only within a transformation; rotation prediction claims remain
+specific to the zero-filled operator.
+
+## 10. Export results
 
 Every run must have a unique `run_id` and write resolved configuration,
 predictions, heatmaps, metrics, statistics, tables, figures, logs and a

@@ -1,6 +1,6 @@
 # Implementation and experiment readiness
 
-Date: 2026-07-23
+Date: 2026-07-24
 
 ## Implemented
 
@@ -73,6 +73,13 @@ Date: 2026-07-23
   contrast has 14 common samples from 12 leaves and is retained as three
   non-estimable endpoint rows. The output remains 576 rows (573 estimable,
   three non-estimable), with conservative reserved Holm family slots.
+- Official statistical analysis completed with all acceptance criteria passing.
+  Report SHA `68a9b47f...294de` binds 576 paired rows: 573 estimable and the
+  three approved non-estimable Score-CAM by Gaussian-blur-severe rows.
+- Approved `DR-RESULTS-001` freezes that report plus its six child CSV hashes
+  and authorizes a CPU-only, read-only reporting stage. The runner emits an
+  exact allowlist of eight tables, six figures and two result summaries, then
+  hashes every child artifact into an immutable reporting report.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
 
@@ -81,7 +88,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (73 tests; torch integration skipped when unavailable)
+pytest                          PASS (90 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -119,10 +126,11 @@ Colab completed the cumulative quarantine, yielding 8,384 eligible samples,
 Leaf-safe freeze, deterministic loading, both backbone smoke runs and all six
 target-layer/CAM checks pass. `DR-RUNTIME-001` and `DR-XAI-001` bind the
 reported evidence hashes. Official baseline predictions and all joint records
-have now been produced and merged. No official confidence interval,
-hypothesis-test p-value or XAI stability conclusion has yet been finalized; the
-approved statistical runner remains to be executed against the two immutable
-merge trees.
+have been produced and merged. The predeclared statistical analysis completed
+successfully, including 10,000-replicate leaf-cluster intervals, paired
+Wilcoxon tests and fixed Holm families. Its verified report is frozen by
+`DR-RESULTS-001`; publication tables, figures and summaries must now be
+derived only from those frozen artifacts.
 
 `DR-SEVERITY-006` binds the approved v6 pilot and four visual-review artifacts.
 Its outcome is `PASS_WITH_DECLARED_OPERATOR_LIMITATION`: severity is ordinal
@@ -135,16 +143,15 @@ configuration to the later G1 governance state; checkpoint files are not
 rewritten or re-signed. The resulting G1 governance protocol hash is
 `88440f4e740a707e128cb80d0680dca4f38c104388f51d9493b5b1adb76affe9`.
 
-The recovery, all six model-method parts, both model merges and the
-metadata-only 192-contrast support audit are complete.
+The recovery, all six model-method parts, both model merges, the metadata-only
+192-contrast support audit and the final statistical analysis are complete.
 The remaining work is staged as follows:
 
-1. Run the approved `DR-ANALYSIS-001` CPU-only analysis with
-   `DR-ANALYSIS-SUPPORT-001` against the exact two merged-report hashes.
-2. Review the resulting acceptance criteria and preserve the analysis-report
-   SHA-256 without modifying any statistical family.
-3. Populate the paper tables and figures from the immutable analysis artifacts;
-   do not use official-test results for reselection or tuning.
+1. Run the `DR-RESULTS-001` CPU-only reporting generator against the exact
+   `statistical-analysis-v2` directory.
+2. Verify and preserve the generated reporting-report SHA-256.
+3. Integrate the frozen tables and figures into the manuscript without
+   reselection, tuning or interpreting non-estimable rows as non-significant.
 
 Severity pilot v1 passed its original numerical gate but failed human visual
 review because brightness and rotation direction, and the Gaussian base-noise

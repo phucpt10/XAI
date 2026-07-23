@@ -65,6 +65,12 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
   endpoint rows. The fixed 576-row plan and Holm family membership remain
   intact: 573 rows are estimable and three reserve adjustment-only family
   slots without reporting p-values or effect sizes.
+- Approved `DR-RESULTS-001` freezes the verified official-analysis report and
+  all six child CSV hashes. Its CPU-only reporting runner creates exactly eight
+  tables, six figures and two human/machine-readable summaries without
+  reopening image pixels or recomputing predictions, CAMs or statistics.
+  The three insufficient-support rows remain explicitly non-estimable and
+  cannot be described as non-significant.
 - Infrastructure-only physical-freeze recovery governed by `DR-RECOVERY-001`.
   It keeps the historical freeze hash as logical lineage, records the recovered
   physical hash separately, re-verifies every manifest image and prevents
@@ -103,5 +109,7 @@ boolean protocol flag alone cannot authorize pixel access.
 8. Merge both complete model result trees and run the predeclared
    `DR-ANALYSIS-001` analysis under the support adjudication in
    `DR-ANALYSIS-SUPPORT-001`, without reopening image pixels.
+9. Generate publication reporting artifacts from the analysis frozen by
+   `DR-RESULTS-001`; do not use them for system selection or tuning.
 
 No dataset count, accuracy, confidence interval, p-value or stability result is fabricated by this repository.
