@@ -193,6 +193,8 @@ def authorize_official_test_run(
     checkpoint_decision_path: str | Path,
     test_decision_path: str | Path,
     readiness_report_path: str | Path,
+    recovery_decision_path: str | Path | None = None,
+    recovery_binding_report_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Validate every authorization artifact before a runner opens test pixels."""
     from plantxai_stability.data.freeze import require_frozen_artifacts
@@ -208,10 +210,42 @@ def authorize_official_test_run(
     readiness_file = Path(readiness_report_path)
     manifest_sha256 = sha256_file(manifest)
     require_frozen_artifacts(manifest)
-    freeze_record_sha256 = sha256_file(manifest.parent / "freeze_record.json")
+    physical_freeze_record_sha256 = sha256_file(
+        manifest.parent / "freeze_record.json"
+    )
     checkpoint_decision = _load_yaml_mapping(checkpoint_decision_file)
     test_decision = _load_yaml_mapping(test_decision_file)
     readiness_report = json.loads(readiness_file.read_text(encoding="utf-8"))
+    expected_historical_freeze_sha256 = test_decision.get(
+        "readiness_evidence", {}
+    ).get("freeze_record_sha256")
+    recovery_lineage: dict[str, Any] | None = None
+    if physical_freeze_record_sha256 == expected_historical_freeze_sha256:
+        freeze_record_sha256 = physical_freeze_record_sha256
+        if recovery_decision_path is not None or recovery_binding_report_path is not None:
+            raise ValueError(
+                "Recovery evidence supplied for an unchanged historical physical freeze"
+            )
+    else:
+        if recovery_decision_path is None or recovery_binding_report_path is None:
+            raise ValueError(
+                "Physical freeze differs from historical lineage; "
+                "DR-RECOVERY-001 and a recovery binding report are required"
+            )
+        from plantxai_stability.recovery import validate_recovery_binding
+
+        recovery_lineage = validate_recovery_binding(
+            manifest_path=manifest,
+            recovery_decision_path=recovery_decision_path,
+            recovery_binding_report_path=recovery_binding_report_path,
+        )
+        freeze_record_sha256 = recovery_lineage[
+            "historical_final_freeze_record_sha256"
+        ]
+        if physical_freeze_record_sha256 != recovery_lineage[
+            "physical_freeze_record_sha256"
+        ]:
+            raise ValueError("Recovery physical freeze identity diverges")
     scenarios = [
         f"{name}_{severity}"
         for name in resolved.values["transformations"]["names"]
@@ -255,6 +289,8 @@ def authorize_official_test_run(
         "checkpoint_sha256": checkpoint_sha256,
         "manifest_sha256": manifest_sha256,
         "freeze_record_sha256": freeze_record_sha256,
+        "physical_freeze_record_sha256": physical_freeze_record_sha256,
+        "recovery_lineage": recovery_lineage,
         "test_decision_record_sha256": sha256_file(test_decision_file),
         "checkpoint_decision_record_sha256": sha256_file(checkpoint_decision_file),
         "g2_readiness_report_sha256": sha256_file(readiness_file),

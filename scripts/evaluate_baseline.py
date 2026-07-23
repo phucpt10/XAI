@@ -18,6 +18,7 @@ from plantxai_stability.config import load_protocol
 from plantxai_stability.data.loader import PlantDataset, build_torch_dataloader
 from plantxai_stability.models import ModelWrapper
 from plantxai_stability.provenance import sha256_file
+from plantxai_stability.recovery import load_recovery_decision
 from plantxai_stability.test_authorization import authorize_official_test_run
 from plantxai_stability.training import load_checkpoint
 
@@ -38,6 +39,16 @@ def main() -> int:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--num-workers", type=int, default=0)
     args = parser.parse_args()
+    recovery_decision_path = (
+        args.protocol.parent / "decision_records" / "DR-RECOVERY-001.yaml"
+    )
+    if recovery_decision_path.is_file():
+        recovery_decision = load_recovery_decision(recovery_decision_path)
+        if recovery_decision["recovery_policy"]["no_baseline_rerun"]:
+            raise SystemExit(
+                "Baseline rerun prohibited by DR-RECOVERY-001; preserve the "
+                "two existing baseline reports"
+            )
     if args.output_dir.exists():
         raise SystemExit("Baseline output exists; use a new immutable run directory")
     resolved = load_protocol(args.protocol)

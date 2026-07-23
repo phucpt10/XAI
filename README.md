@@ -52,6 +52,10 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
   caches each original CAM once per method and preserves explicit exclusions.
 - Fail-closed joint merger that requires exact prediction agreement across the
   three method parts and complete sample x scenario x method coverage.
+- Infrastructure-only physical-freeze recovery governed by `DR-RECOVERY-001`.
+  It keeps the historical freeze hash as logical lineage, records the recovered
+  physical hash separately, re-verifies every manifest image and prevents
+  recomputation of completed official results.
 - Optional CAM adapter for Grad-CAM, Grad-CAM++ and Score-CAM through `pytorch-grad-cam`.
 - Runtime-approved CAM targets `layer4[-1]` (ResNet50) and `features[-1]`
   (EfficientNet-B0), pinned by `DR-XAI-001` evidence.

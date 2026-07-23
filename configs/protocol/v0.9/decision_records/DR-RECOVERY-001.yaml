@@ -1,0 +1,85 @@
+decision_id: DR-RECOVERY-001
+title: Recovery of physical freeze artifacts after Colab runtime loss
+status: approved
+decision_type: infrastructure_only_freeze_recovery
+approved_at_utc: 2026-07-23
+approved_by: project_owner
+
+recovery_evidence:
+  archive_sha256: 0669d3eb6e26c7752b9fa1bf240f54f136e7d2c031653aa72436695a8e0c7930
+  recovery_audit_sha256: f21999cb39843218200f61ae6e20fbf078e2111be32f45b0c3ffd47e62418d43
+  manifest_sha256: 323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894
+  verified_sample_count: 8384
+  split_counts:
+    train: 5328
+    validation: 1363
+    test: 1693
+  historical_final_freeze_record_sha256: aed2e96afd2749250d4151780bb4002d198eb96d7433d2bef5b03d4a6ac9212d
+  recovered_source_freeze_record_sha256: 15e7a8a01e7acb63b0b733150b72a8cccb33ddca86929f3ae2c3854d4a41e4bb
+  checkpoint_training_protocol_hash: 7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b
+  governance_protocol_hash: ceaef8a293b877c61a81f046dbcca5ec9abdf7092c38e43fb1aa6225e76d8b02
+
+preserved_official_results:
+  baselines:
+    resnet50_report_sha256: d7f86d988dc09ef119a0c0f1a3f2ddad223e1e17846f14d5bc680855c46b0877
+    efficientnet_b0_report_sha256: 02e57a201ff37c4537ec57e45a4df48d3161c2b0f4982fd2c202d85514005252
+  completed_joint_part:
+    model_id: resnet50
+    xai_method: grad_cam
+    run_id: resnet50-grad_cam-v1
+    joint_run_report_sha256: f130afa20748d5265037ec65f17f71197871344a6f4f7b949d55cc5985406bc7
+    run_identity_sha256: 5ee4af7e2f8b4d683064a98a1e339dc8aea17f49715c97065c573f681da19bd4
+    source_git_commit: 4d8ee5da1fa83ed425ba8a8c54e89b22151a5f04
+
+authorized_remaining_joint_parts:
+  - model_id: resnet50
+    xai_method: grad_cam_plus_plus
+  - model_id: resnet50
+    xai_method: score_cam
+  - model_id: efficientnet_b0
+    xai_method: grad_cam
+  - model_id: efficientnet_b0
+    xai_method: grad_cam_plus_plus
+  - model_id: efficientnet_b0
+    xai_method: score_cam
+
+recovery_policy:
+  infrastructure_only: true
+  physical_freeze_hash_must_be_distinct_from_historical_hash: true
+  logical_historical_freeze_lineage_preserved: true
+  verify_all_manifest_image_hashes_before_reauthorization: true
+  no_dataset_change: true
+  no_split_change: true
+  no_checkpoint_change: true
+  no_transformation_change: true
+  no_xai_change: true
+  no_scientific_protocol_change: true
+  no_result_change: true
+  no_baseline_rerun: true
+  no_completed_resnet50_grad_cam_rerun: true
+  no_test_based_selection_or_tuning: true
+  fail_closed_on_any_mismatch: true
+
+decision: >-
+  Authorize reconstruction of physical freeze artifacts solely to recover from
+  ephemeral Colab storage loss. The historical final freeze SHA remains the
+  logical scientific lineage. A newly generated physical freeze SHA must be
+  recorded separately and may be used only through a passing recovery binding
+  gate. Existing baseline results and the completed ResNet50 Grad-CAM part are
+  immutable and must not be recomputed.
+
+project_owner_approval: >-
+  Tôi phê duyệt DR-RECOVERY-001 dựa trên archive SHA
+  0669d3eb6e26c7752b9fa1bf240f54f136e7d2c031653aa72436695a8e0c7930 và
+  recovery audit SHA
+  f21999cb39843218200f61ae6e20fbf078e2111be32f45b0c3ffd47e62418d43.
+  Cho phép tái dựng physical freeze artifacts từ manifest SHA
+  323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894 và
+  8.384 ảnh đã xác minh, đồng thời tạo fail-closed lineage bridge tới
+  historical final freeze SHA
+  aed2e96afd2749250d4151780bb4002d198eb96d7433d2bef5b03d4a6ac9212d.
+  Recovery chỉ là xử lý hạ tầng, không thay đổi dataset, split, checkpoint,
+  transformation, XAI, protocol khoa học hoặc kết quả đã có; không chạy lại
+  baseline hay ResNet50 Grad-CAM; chỉ tiếp tục năm model-method parts còn lại
+  sau khi recovery gate PASS. Không sử dụng kết quả official test để lựa chọn
+  hoặc tinh chỉnh hệ thống.

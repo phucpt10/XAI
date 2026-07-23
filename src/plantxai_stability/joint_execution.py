@@ -49,6 +49,7 @@ def build_run_identity(
     software_version: str,
     git_commit: str,
     runtime_identity: dict[str, Any],
+    recovery_lineage: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     ordered_samples = list(sample_ids)
     if ordered_samples != sorted(ordered_samples):
@@ -86,6 +87,8 @@ def build_run_identity(
         "git_commit": git_commit,
         "runtime_identity": runtime_identity,
     }
+    if recovery_lineage is not None:
+        identity["recovery_lineage"] = recovery_lineage
     identity["run_identity_sha256"] = canonical_json_sha256(identity)
     return identity
 

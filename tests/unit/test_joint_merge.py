@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from pathlib import Path
 
 import pytest
 
@@ -9,6 +10,7 @@ from plantxai_stability.provenance import sha256_file
 from scripts.merge_joint_runs import (
     _load_part,
     _prediction_payload,
+    _validate_recovery_transition,
     _validate_baseline_binding,
 )
 
@@ -85,3 +87,43 @@ def test_baseline_binding_rejects_checkpoint_mismatch() -> None:
     baseline["checkpoint_sha256"] = "different"
     with pytest.raises(SystemExit, match="checkpoint_sha256"):
         _validate_baseline_binding(baseline, identity)
+
+
+def test_recovery_transition_accepts_one_commit_for_new_efficientnet_parts(
+    tmp_path,
+) -> None:
+    lineage = {"physical_freeze_record_sha256": "physical"}
+    parts = []
+    for method in ("grad_cam", "grad_cam_plus_plus", "score_cam"):
+        part = tmp_path / method
+        part.mkdir()
+        (part / "joint_run_report.json").write_text("{}", encoding="utf-8")
+        parts.append(
+            {
+                "path": part,
+                "report": {
+                    "run_identity": {
+                        "model_id": "efficientnet_b0",
+                        "xai_method": method,
+                        "git_commit": "recovery-commit",
+                        "recovery_lineage": lineage,
+                    }
+                },
+            }
+        )
+    assert _validate_recovery_transition(
+        parts=parts,
+        recovery_lineage=lineage,
+        recovery_decision_path=(
+            Path("configs/protocol/v0.9/decision_records/DR-RECOVERY-001.yaml")
+        ),
+    )
+    parts[-1]["report"]["run_identity"]["git_commit"] = "different"
+    with pytest.raises(SystemExit, match="one infrastructure-recovery commit"):
+        _validate_recovery_transition(
+            parts=parts,
+            recovery_lineage=lineage,
+            recovery_decision_path=(
+                Path("configs/protocol/v0.9/decision_records/DR-RECOVERY-001.yaml")
+            ),
+        )

@@ -29,6 +29,7 @@ from plantxai_stability.joint_execution import (
 )
 from plantxai_stability.models import ModelWrapper
 from plantxai_stability.provenance import sha256_bytes, sha256_file
+from plantxai_stability.recovery import authorize_recovery_joint_part
 from plantxai_stability.statistics import heatmap_metrics
 from plantxai_stability.test_authorization import authorize_official_test_run
 from plantxai_stability.training import load_checkpoint, seed_everything
@@ -63,6 +64,8 @@ def main() -> int:
     parser.add_argument("--checkpoint-decision-record", type=Path, required=True)
     parser.add_argument("--test-decision-record", type=Path, required=True)
     parser.add_argument("--g2-readiness-report", type=Path, required=True)
+    parser.add_argument("--recovery-decision-record", type=Path)
+    parser.add_argument("--recovery-binding-report", type=Path)
     parser.add_argument(
         "--model-id", choices=["resnet50", "efficientnet_b0"], required=True
     )
@@ -79,6 +82,16 @@ def main() -> int:
     args = parser.parse_args()
     if args.progress_every < 1:
         raise SystemExit("--progress-every must be at least 1")
+    governed_recovery = (
+        args.protocol.parent / "decision_records" / "DR-RECOVERY-001.yaml"
+    )
+    if governed_recovery.is_file() and (
+        args.recovery_decision_record is None
+        or args.recovery_binding_report is None
+    ):
+        raise SystemExit(
+            "DR-RECOVERY-001 is active; both recovery evidence arguments are required"
+        )
 
     resolved = load_protocol(args.protocol)
     declared_methods = list(resolved.values["xai"]["methods"])
@@ -92,7 +105,17 @@ def main() -> int:
         checkpoint_decision_path=args.checkpoint_decision_record,
         test_decision_path=args.test_decision_record,
         readiness_report_path=args.g2_readiness_report,
+        recovery_decision_path=args.recovery_decision_record,
+        recovery_binding_report_path=args.recovery_binding_report,
     )
+    if authorization["recovery_lineage"] is not None:
+        if args.recovery_decision_record is None:
+            raise ValueError("Recovery lineage is missing its Decision Record")
+        authorize_recovery_joint_part(
+            model_id=args.model_id,
+            xai_method=args.xai_method,
+            recovery_decision_path=args.recovery_decision_record,
+        )
     records = sorted(authorization["test_records"], key=lambda item: item.sample_id)
     scenarios = scenario_grid(resolved.values["transformations"]["parameters"])
     scenario_ids = [scenario.scenario_id for scenario in scenarios]
@@ -140,6 +163,7 @@ def main() -> int:
         software_version=__version__,
         git_commit=git_commit,
         runtime_identity=runtime_identity,
+        recovery_lineage=authorization["recovery_lineage"],
     )
 
     output = args.output_dir / args.run_id
@@ -315,6 +339,7 @@ def main() -> int:
         "artifact_sha256": artifacts,
         "acceptance_criteria": {
             "g2_authorization_passed_before_pixel_access": True,
+            "recovery_binding_requirement_satisfied": True,
             "checkpoint_and_protocol_lineage_match": True,
             "transactional_sample_commits": True,
             "resume_identity_bound": True,

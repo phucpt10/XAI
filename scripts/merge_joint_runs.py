@@ -12,6 +12,11 @@ from typing import Any
 from plantxai_stability.artifacts import atomic_json
 from plantxai_stability.config import load_protocol
 from plantxai_stability.provenance import sha256_file
+from plantxai_stability.recovery import (
+    load_recovery_decision,
+    validate_preserved_joint_part,
+    validate_recovery_binding,
+)
 
 
 def main() -> int:
@@ -21,9 +26,38 @@ def main() -> int:
     parser.add_argument("--part-dir", type=Path, action="append", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--recovery-decision-record", type=Path)
+    parser.add_argument("--recovery-binding-report", type=Path)
     args = parser.parse_args()
     if args.output_dir.exists():
         raise SystemExit("Merged output exists; use a new immutable directory")
+    recovery_values = (
+        args.manifest,
+        args.recovery_decision_record,
+        args.recovery_binding_report,
+    )
+    if any(value is not None for value in recovery_values) and not all(
+        value is not None for value in recovery_values
+    ):
+        raise SystemExit(
+            "--manifest, --recovery-decision-record and "
+            "--recovery-binding-report must be supplied together"
+        )
+    governed_recovery = (
+        args.protocol.parent / "decision_records" / "DR-RECOVERY-001.yaml"
+    )
+    if governed_recovery.is_file() and args.recovery_decision_record is None:
+        raise SystemExit(
+            "DR-RECOVERY-001 is active; recovery evidence is required for merge"
+        )
+    recovery_lineage = None
+    if args.recovery_decision_record is not None:
+        recovery_lineage = validate_recovery_binding(
+            manifest_path=args.manifest,
+            recovery_decision_path=args.recovery_decision_record,
+            recovery_binding_report_path=args.recovery_binding_report,
+        )
 
     resolved = load_protocol(args.protocol)
     declared_methods = list(resolved.values["xai"]["methods"])
@@ -43,7 +77,7 @@ def main() -> int:
         raise SystemExit("Joint parts do not cover the three declared XAI methods exactly")
 
     reference_identity = parts[0]["report"]["run_identity"]
-    shared_identity_keys = (
+    scientific_shared_identity_keys = (
         "schema_version",
         "model_id",
         "campaign_id",
@@ -64,21 +98,49 @@ def main() -> int:
         "transformation_algorithm_version",
         "xai_policy",
         "software_version",
-        "git_commit",
         "runtime_identity",
     )
     for part in parts[1:]:
         identity = part["report"]["run_identity"]
         mismatches = [
             key
-            for key in shared_identity_keys
+            for key in scientific_shared_identity_keys
             if identity.get(key) != reference_identity.get(key)
         ]
         if mismatches:
             raise SystemExit(f"Joint part lineage mismatch: {mismatches}")
+    if recovery_lineage is None:
+        commits = {part["report"]["run_identity"].get("git_commit") for part in parts}
+        if len(commits) != 1:
+            raise SystemExit("Joint part lineage mismatch: ['git_commit']")
+        recovery_transition_passed = False
+    else:
+        recovery_transition_passed = _validate_recovery_transition(
+            parts=parts,
+            recovery_lineage=recovery_lineage,
+            recovery_decision_path=args.recovery_decision_record,
+        )
     if reference_identity["governance_protocol_hash"] != resolved.sha256:
         raise SystemExit("Joint parts do not match the current frozen governance protocol")
     _validate_baseline_binding(baseline, reference_identity)
+    preserved_baseline_hash_matches = True
+    if recovery_lineage is not None:
+        recovery_decision = load_recovery_decision(args.recovery_decision_record)
+        baseline_key = (
+            "resnet50_report_sha256"
+            if reference_identity["model_id"] == "resnet50"
+            else "efficientnet_b0_report_sha256"
+        )
+        expected_baseline_hash = recovery_decision["preserved_official_results"][
+            "baselines"
+        ][baseline_key]
+        preserved_baseline_hash_matches = (
+            sha256_file(args.baseline_report) == expected_baseline_hash
+        )
+        if not preserved_baseline_hash_matches:
+            raise SystemExit(
+                "Baseline report is not the exact result preserved by DR-RECOVERY-001"
+            )
 
     reference_predictions = _prediction_payload(parts[0]["predictions"])
     for part in parts[1:]:
@@ -114,10 +176,14 @@ def main() -> int:
     }
     criteria = {
         "baseline_binding_matches": True,
+        "preserved_baseline_hash_matches": preserved_baseline_hash_matches,
         "all_declared_methods_present": sorted(methods) == sorted(declared_methods),
         "child_artifact_hashes_match": True,
         "child_runs_complete": True,
         "shared_lineage_exact": True,
+        "recovery_lineage_bridge_passed": (
+            recovery_transition_passed if recovery_lineage is not None else True
+        ),
         "predictions_identical_across_method_parts": True,
         "prediction_factorial_coverage_exact": (
             len(merged_predictions) == expected_prediction_count
@@ -156,6 +222,7 @@ def main() -> int:
         "checkpoint_sha256": reference_identity["checkpoint_sha256"],
         "manifest_sha256": reference_identity["manifest_sha256"],
         "freeze_record_sha256": reference_identity["freeze_record_sha256"],
+        "recovery_lineage": recovery_lineage,
         "official_test_identity": baseline["official_test_identity"],
         "scenario_ids": scenario_ids,
         "xai_methods": declared_methods,
@@ -240,6 +307,48 @@ def _validate_baseline_binding(
     ]
     if mismatches:
         raise SystemExit(f"Baseline/joint lineage mismatch: {mismatches}")
+
+
+def _validate_recovery_transition(
+    *,
+    parts: list[dict[str, Any]],
+    recovery_lineage: dict[str, Any],
+    recovery_decision_path: Path,
+) -> bool:
+    decision = load_recovery_decision(recovery_decision_path)
+    preserved = decision["preserved_official_results"]["completed_joint_part"]
+    preserved_hash = preserved["joint_run_report_sha256"]
+    model_id = parts[0]["report"]["run_identity"]["model_id"]
+    legacy_count = 0
+    recovered_commits: set[str] = set()
+    for part in parts:
+        report_hash = sha256_file(part["path"] / "joint_run_report.json")
+        identity = part["report"]["run_identity"]
+        if report_hash == preserved_hash:
+            validate_preserved_joint_part(
+                part_dir=part["path"],
+                recovery_decision_path=recovery_decision_path,
+            )
+            legacy_count += 1
+            continue
+        if identity.get("recovery_lineage") != recovery_lineage:
+            raise SystemExit(
+                f"Joint part lacks the approved recovery lineage: {part['path']}"
+            )
+        commit = identity.get("git_commit")
+        if not isinstance(commit, str) or not commit:
+            raise SystemExit("Recovered joint part lacks a Git commit")
+        recovered_commits.add(commit)
+    expected_legacy_count = 1 if model_id == preserved["model_id"] else 0
+    if legacy_count != expected_legacy_count:
+        raise SystemExit(
+            "Recovery merge does not preserve the exact approved legacy joint part"
+        )
+    if len(recovered_commits) != 1:
+        raise SystemExit(
+            "Recovered joint parts must share one infrastructure-recovery commit"
+        )
+    return True
 
 
 def _prediction_payload(rows: list[dict[str, str]]) -> list[dict[str, str]]:

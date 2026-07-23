@@ -444,6 +444,10 @@ Run the registered joint campaign as six model-method parts. The launcher skips
 completed parts and resumes an interrupted part from its last transaction, so
 the same command is safe after a Colab disconnect:
 
+The command immediately below documents the original, pre-recovery execution.
+After approval of `DR-RECOVERY-001`, do not run it; use the recovery command in
+the following subsection.
+
 ```python
 !python scripts/run_joint_campaign_colab.py \
   --protocol configs/protocol/v0.9/protocol.yaml \
@@ -484,6 +488,68 @@ report for the second merge. A successful merged model contains exactly 20,316
 prediction rows (`1,693 x 12`) and 60,948 joint rows (`1,693 x 12 x 3`),
 including explicit exclusion rows where prediction consistency or CAM quality
 prevents a stability metric.
+
+### Recover after loss of the final physical freeze
+
+Use this path only for the storage-loss event approved by
+`DR-RECOVERY-001`. It does not recreate or claim the historical
+`freeze_record.json` SHA. Instead, it creates a distinct physical freeze and a
+fail-closed bridge to the historical logical SHA.
+
+First reconstruct the physical freeze in Google Drive so another Colab reset
+does not remove it. This command hashes the archive once and re-verifies all
+8,384 manifest images; it does not compute predictions or XAI results:
+
+```python
+%cd /content/PlantXAI-Stability
+
+!python scripts/recover_official_freeze.py \
+  --source-freeze-dir /content/plantxai-frozen-v1 \
+  --image-root /content/plantxai-manifest-v2 \
+  --archive /content/drive/MyDrive/PlantXAI-Stability/dataset-backup-v1/plantxai-dataset-bundle.tar \
+  --recovery-audit /content/drive/MyDrive/PlantXAI-Stability/dataset-backup-v1/recovery_integrity_audit_v1.json \
+  --recovery-decision-record configs/protocol/v0.9/decision_records/DR-RECOVERY-001.yaml \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/dataset-recovery-v1/plantxai-frozen-recovery-v1
+```
+
+Proceed only when the final line is
+`New official execution authorized through recovery bridge: TRUE`. Preserve
+the printed binding-report SHA. Do not rerun either baseline and do not rerun
+`resnet50/grad_cam`.
+
+Continue the joint campaign with both recovery artifacts. The launcher verifies
+and skips the exact approved legacy Grad-CAM part, permits only the five
+unfinished model-method cells and transactionally resumes any post-recovery
+part:
+
+```python
+!python scripts/run_joint_campaign_colab.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --manifest /content/drive/MyDrive/PlantXAI-Stability/dataset-recovery-v1/plantxai-frozen-recovery-v1/dataset_manifest.csv \
+  --image-root /content/plantxai-manifest-v2 \
+  --checkpoint-decision-record configs/protocol/v0.9/decision_records/DR-CHECKPOINT-001.yaml \
+  --test-decision-record configs/protocol/v0.9/decision_records/DR-TEST-001.yaml \
+  --g2-readiness-report /content/drive/MyDrive/PlantXAI-Stability/runs/g2-readiness-v1/g2_readiness_report.json \
+  --recovery-decision-record configs/protocol/v0.9/decision_records/DR-RECOVERY-001.yaml \
+  --recovery-binding-report /content/drive/MyDrive/PlantXAI-Stability/dataset-recovery-v1/plantxai-frozen-recovery-v1/recovery_binding_report.json \
+  --resnet50-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/resnet50-v1/resnet50_best.pt \
+  --efficientnet-b0-checkpoint /content/drive/MyDrive/PlantXAI-Stability/runs/g0b-7eb0814b/efficientnet-b0-v1/efficientnet_b0_best.pt \
+  --output-root /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/joint-parts \
+  --device cuda
+```
+
+For each model merge, add these three arguments to the normal merge command:
+
+```text
+--manifest /content/drive/MyDrive/PlantXAI-Stability/dataset-recovery-v1/plantxai-frozen-recovery-v1/dataset_manifest.csv
+--recovery-decision-record configs/protocol/v0.9/decision_records/DR-RECOVERY-001.yaml
+--recovery-binding-report /content/drive/MyDrive/PlantXAI-Stability/dataset-recovery-v1/plantxai-frozen-recovery-v1/recovery_binding_report.json
+```
+
+The ResNet50 merge must contain the exact preserved Grad-CAM report SHA
+`f130afa20748d5265037ec65f17f71197871344a6f4f7b949d55cc5985406bc7`.
+The merger rejects any replacement, recomputation or unapproved code-lineage
+transition.
 
 Keep checkpoints and run outputs outside the source tree or in Git LFS/object
 storage; do not commit model weights to the normal Git history.

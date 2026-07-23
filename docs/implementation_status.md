@@ -56,6 +56,11 @@ Date: 2026-07-23
   interruption. Every committed sample contains the full 12-scenario cross
   product; method parts are merged only after exact lineage, artifact hash,
   prediction equality and factorial-coverage checks.
+- Approved `DR-RECOVERY-001` infrastructure-only recovery policy. It preserves
+  the historical final-freeze SHA as logical lineage, records a distinct
+  recovered physical-freeze SHA, independently verifies all 8,384 image hashes,
+  prohibits baseline and completed ResNet50 Grad-CAM reruns, and authorizes
+  only the five unfinished model-method parts through a fail-closed bridge.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
@@ -65,7 +70,7 @@ Date: 2026-07-23
 ```text
 ruff check src tests scripts    PASS
 mypy src                        PASS
-pytest                          PASS (69 tests; torch integration skipped when unavailable)
+pytest                          PASS (73 tests; torch integration skipped when unavailable)
 compileall                      PASS
 protocol validation             PASS
 scenario smoke                 PASS (12 scenarios)
@@ -76,8 +81,10 @@ constant heatmap gate          PASS
 
 G2 governance and the runtime authorization gate both pass for the single
 registered campaign. Official baseline evaluation is complete for both models;
-joint robustness/XAI execution remains. Official training stays bound to the
-final G0B freeze. The protocol has:
+the ResNet50 Grad-CAM joint part is complete and the other five joint parts
+remain. Official training stays bound to the final G0B freeze. A Colab storage
+loss removed the physical final freeze, but the approved recovery path does not
+alter its logical scientific lineage. The protocol has:
 
 ```text
 status: frozen
@@ -117,10 +124,12 @@ rewritten or re-signed. The resulting G1 governance protocol hash is
 
 The remaining work is staged as follows:
 
-1. Run six resumable joint parts (two models x three declared CAM methods).
-2. Merge each model only after exact 1,693 x 12 x 3 coverage and child-artifact
+1. Reconstruct and verify the physical freeze under `DR-RECOVERY-001`.
+2. Preserve the completed ResNet50 Grad-CAM part and run only the five
+   unfinished model-method parts.
+3. Merge each model only after exact 1,693 x 12 x 3 coverage and child-artifact
    verification pass.
-3. Compute the predeclared leaf-cluster statistics and generate report tables;
+4. Compute the predeclared leaf-cluster statistics and generate report tables;
    do not use these official-test results for any reselection or tuning.
 
 Severity pilot v1 passed its original numerical gate but failed human visual
