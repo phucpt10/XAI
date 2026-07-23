@@ -57,6 +57,9 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
   `leaf_id`, intersects paired sample identities before leaf aggregation,
   applies the predeclared Wilcoxon/Holm families and retains every exclusion
   in a separate audit table.
+- Metadata-only analysis-support preflight covering all 192 planned model,
+  CAM-method and within-transformation severity contrasts without reading
+  endpoint metric columns or computing hypothesis tests.
 - Infrastructure-only physical-freeze recovery governed by `DR-RECOVERY-001`.
   It keeps the historical freeze hash as logical lineage, records the recovered
   physical hash separately, re-verifies every manifest image and prevents

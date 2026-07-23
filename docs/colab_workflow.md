@@ -568,6 +568,26 @@ This stage does not decode images and does not require a GPU. Change the Colab
 hardware accelerator to CPU before running it. Use a new immutable output
 directory:
 
+Before rerunning the statistical analysis after an insufficient-support stop,
+audit all predeclared paired contrasts. This reads identity and exclusion
+columns only:
+
+```python
+!python scripts/audit_analysis_support.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --analysis-decision-record configs/protocol/v0.9/decision_records/DR-ANALYSIS-001.yaml \
+  --resnet50-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/resnet50-joint-merged-v1 \
+  --efficientnet-b0-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/efficientnet-b0-joint-merged-v1 \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/analysis-support-audit-v2
+```
+
+The audit must print `Analysis support audit: PASS`. If its final support gate
+is `BLOCKED_PENDING_ADJUDICATION`, preserve the report SHA and both support CSV
+files. Do not lower the minimum leaf count or change a Holm family from the
+not-yet-estimated endpoint values.
+
+After the support audit is resolved through a separate Decision Record, run:
+
 ```python
 %cd /content/PlantXAI-Stability
 
