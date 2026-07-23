@@ -62,6 +62,11 @@ Date: 2026-07-23
   prohibits baseline and completed ResNet50 Grad-CAM reruns, and authorizes
   only the five unfinished model-method parts through a fail-closed bridge.
 - Heatmap quality gate, metrics, leaf-cluster bootstrap, paired Wilcoxon and Holm correction.
+- Approved `DR-ANALYSIS-001` binds the exact ResNet50 and EfficientNet-B0
+  merged-report hashes before final metric analysis. Its CPU-only runner
+  enforces common paired sample keys, leaf-level inference, 10,000 bootstrap
+  replicates, explicit Holm families, immutable outputs and a complete
+  exclusion audit.
 - Joint prediction/explanation contracts, run provenance and artifact indexing.
 - Unit, integration and scientific invariant tests.
 
@@ -80,11 +85,11 @@ constant heatmap gate          PASS
 ## Official experiment status
 
 G2 governance and the runtime authorization gate both pass for the single
-registered campaign. Official baseline evaluation is complete for both models;
-the ResNet50 Grad-CAM joint part is complete and the other five joint parts
-remain. Official training stays bound to the final G0B freeze. A Colab storage
-loss removed the physical final freeze, but the approved recovery path does not
-alter its logical scientific lineage. The protocol has:
+registered campaign. Official baseline evaluation, all six model-method joint
+parts and both model merges are complete. Official training stays bound to the
+final G0B freeze. A Colab storage loss removed the physical final freeze, but
+the approved recovery path does not alter its logical scientific lineage. The
+protocol has:
 
 ```text
 status: frozen
@@ -107,9 +112,11 @@ Colab completed the cumulative quarantine, yielding 8,384 eligible samples,
 14 quarantined train samples and all 1,693 official test samples preserved.
 Leaf-safe freeze, deterministic loading, both backbone smoke runs and all six
 target-layer/CAM checks pass. `DR-RUNTIME-001` and `DR-XAI-001` bind the
-reported evidence hashes. Official baseline predictions have now been produced;
-no official confidence interval, hypothesis-test p-value or XAI stability result
-has yet been finalized.
+reported evidence hashes. Official baseline predictions and all joint records
+have now been produced and merged. No official confidence interval,
+hypothesis-test p-value or XAI stability conclusion has yet been finalized; the
+approved statistical runner remains to be executed against the two immutable
+merge trees.
 
 `DR-SEVERITY-006` binds the approved v6 pilot and four visual-review artifacts.
 Its outcome is `PASS_WITH_DECLARED_OPERATOR_LIMITATION`: severity is ordinal
@@ -122,15 +129,15 @@ configuration to the later G1 governance state; checkpoint files are not
 rewritten or re-signed. The resulting G1 governance protocol hash is
 `88440f4e740a707e128cb80d0680dca4f38c104388f51d9493b5b1adb76affe9`.
 
+The recovery, all six model-method parts and both model merges are complete.
 The remaining work is staged as follows:
 
-1. Reconstruct and verify the physical freeze under `DR-RECOVERY-001`.
-2. Preserve the completed ResNet50 Grad-CAM part and run only the five
-   unfinished model-method parts.
-3. Merge each model only after exact 1,693 x 12 x 3 coverage and child-artifact
-   verification pass.
-4. Compute the predeclared leaf-cluster statistics and generate report tables;
-   do not use these official-test results for any reselection or tuning.
+1. Run the approved `DR-ANALYSIS-001` CPU-only analysis against the exact two
+   merged-report hashes.
+2. Review the resulting acceptance criteria and preserve the analysis-report
+   SHA-256 without modifying any statistical family.
+3. Populate the paper tables and figures from the immutable analysis artifacts;
+   do not use official-test results for reselection or tuning.
 
 Severity pilot v1 passed its original numerical gate but failed human visual
 review because brightness and rotation direction, and the Gaussian base-noise

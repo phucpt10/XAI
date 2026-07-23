@@ -17,7 +17,11 @@ def heatmap_metrics(
 ) -> dict[str, float]:
     if original.shape != transformed.shape:
         raise ValueError("Heatmaps must have identical shapes")
-    mask = np.ones(original.shape, dtype=bool) if valid_mask is None else np.asarray(valid_mask, dtype=bool)
+    mask = (
+        np.ones(original.shape, dtype=bool)
+        if valid_mask is None
+        else np.asarray(valid_mask, dtype=bool)
+    )
     if mask.shape != original.shape or not mask.any():
         raise ValueError("Valid-overlap mask is empty or has the wrong shape")
     if ssim_window_size < 3 or ssim_window_size % 2 == 0:
@@ -104,7 +108,13 @@ def _masked_topk_iou(
     return float(np.count_nonzero(left_top & right_top) / union)
 
 
-def bootstrap_leaf_means(values: Iterable[float], leaf_ids: Iterable[str], iterations: int, seed: int, confidence_level: float = 0.95) -> dict[str, float]:
+def bootstrap_leaf_means(
+    values: Iterable[float],
+    leaf_ids: Iterable[str],
+    iterations: int,
+    seed: int,
+    confidence_level: float = 0.95,
+) -> dict[str, float]:
     value_list = np.asarray(list(values), dtype=float)
     leaf_list = np.asarray(list(leaf_ids), dtype=str)
     unique = np.unique(leaf_list)
@@ -117,7 +127,13 @@ def bootstrap_leaf_means(values: Iterable[float], leaf_ids: Iterable[str], itera
         sampled = rng.choice(unique, size=unique.size, replace=True)
         estimates[index] = np.concatenate([by_leaf[leaf] for leaf in sampled]).mean()
     alpha = (1.0 - confidence_level) / 2.0
-    return {"estimate": float(value_list.mean()), "lower": float(np.quantile(estimates, alpha)), "upper": float(np.quantile(estimates, 1.0 - alpha)), "n_leaf": int(unique.size), "n_value": int(value_list.size)}
+    return {
+        "estimate": float(value_list.mean()),
+        "lower": float(np.quantile(estimates, alpha)),
+        "upper": float(np.quantile(estimates, 1.0 - alpha)),
+        "n_leaf": int(unique.size),
+        "n_value": int(value_list.size),
+    }
 
 
 def holm_adjust(p_values: Iterable[float]) -> list[float]:
@@ -136,11 +152,20 @@ def paired_wilcoxon(x: Iterable[float], y: Iterable[float]) -> dict[str, float]:
     right = np.asarray(list(y), dtype=float)
     if left.size != right.size or left.size == 0:
         raise ValueError("Paired arrays must have equal non-zero length")
+    if not np.isfinite(left).all() or not np.isfinite(right).all():
+        raise ValueError("Paired arrays contain NaN or Inf")
+    difference = left - right
+    if np.all(difference == 0):
+        return {
+            "statistic": 0.0,
+            "p_value": 1.0,
+            "rank_biserial": 0.0,
+            "n_pairs": int(left.size),
+        }
     try:
         from scipy.stats import rankdata, wilcoxon
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("SciPy is required for paired Wilcoxon") from exc
-    difference = left - right
     result = wilcoxon(left, right, zero_method="pratt", alternative="two-sided")
     nonzero = difference[difference != 0]
     if nonzero.size == 0:
@@ -148,4 +173,9 @@ def paired_wilcoxon(x: Iterable[float], y: Iterable[float]) -> dict[str, float]:
     else:
         ranks = rankdata(np.abs(nonzero))
         effect = float((ranks[nonzero > 0].sum() - ranks[nonzero < 0].sum()) / (ranks.sum()))
-    return {"statistic": float(result.statistic), "p_value": float(result.pvalue), "rank_biserial": effect, "n_pairs": int(left.size)}
+    return {
+        "statistic": float(result.statistic),
+        "p_value": float(result.pvalue),
+        "rank_biserial": effect,
+        "n_pairs": int(left.size),
+    }

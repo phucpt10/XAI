@@ -554,7 +554,43 @@ transition.
 Keep checkpoints and run outputs outside the source tree or in Git LFS/object
 storage; do not commit model weights to the normal Git history.
 
-## 8. Export results
+## 8. Run the approved CPU-only statistical analysis
+
+Proceed only after both model merge commands print `Official joint merge:
+PASS`. `DR-ANALYSIS-001` binds the exact accepted merge-report hashes:
+
+```text
+ResNet50        32610c640f3f35455bcdd998a3f0bb1a09eac2ff34f40dcdb51c0d86e8ac7c1e
+EfficientNet-B0 0cc81bef79c9bf273eff753eef74fa737d35d6b8abef7951acd3fa2e6d534401
+```
+
+This stage does not decode images and does not require a GPU. Change the Colab
+hardware accelerator to CPU before running it. Use a new immutable output
+directory:
+
+```python
+%cd /content/PlantXAI-Stability
+
+!python scripts/analyze_official_results.py \
+  --protocol configs/protocol/v0.9/protocol.yaml \
+  --analysis-decision-record configs/protocol/v0.9/decision_records/DR-ANALYSIS-001.yaml \
+  --resnet50-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/resnet50-joint-merged-v1 \
+  --efficientnet-b0-merge-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/efficientnet-b0-joint-merged-v1 \
+  --output-dir /content/drive/MyDrive/PlantXAI-Stability/runs/official-test-v1/statistical-analysis-v1
+```
+
+The runner must end with `Official statistical analysis: PASS`. Preserve the
+printed report SHA-256. It verifies both merge reports and their child CSV
+hashes before reading result rows, requires exact factorial coverage, uses
+10,000 `leaf_id` bootstrap replicates, aggregates common sample pairs to the
+leaf level before paired Wilcoxon tests, and applies only the Holm families
+declared in `DR-ANALYSIS-001`.
+
+The six CSV outputs are reporting artifacts, not inputs to any new model,
+transformation, checkpoint or XAI selection. RQ3 associations are explicitly
+exploratory and have no hypothesis tests.
+
+## 9. Export results
 
 Every run must have a unique `run_id` and write resolved configuration,
 predictions, heatmaps, metrics, statistics, tables, figures, logs and a

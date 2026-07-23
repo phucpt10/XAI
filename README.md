@@ -52,6 +52,11 @@ The implementation follows the English specification in `PlantXAI-Stability_Rese
   caches each original CAM once per method and preserves explicit exclusions.
 - Fail-closed joint merger that requires exact prediction agreement across the
   three method parts and complete sample x scenario x method coverage.
+- Approved `DR-ANALYSIS-001` statistical plan and a CPU-only fail-closed
+  analysis runner. It binds the exact two merged reports, resamples
+  `leaf_id`, intersects paired sample identities before leaf aggregation,
+  applies the predeclared Wilcoxon/Holm families and retains every exclusion
+  in a separate audit table.
 - Infrastructure-only physical-freeze recovery governed by `DR-RECOVERY-001`.
   It keeps the historical freeze hash as logical lineage, records the recovered
   physical hash separately, re-verifies every manifest image and prevents
@@ -87,5 +92,7 @@ boolean protocol flag alone cannot authorize pixel access.
 5. Freeze the pre-training protocol and rebind the frozen dataset record (G0B).
 6. Select, audit and approve both model checkpoints using validation only (G1; complete).
 7. Reconcile final lineage and explicitly unlock official test evaluation (G2).
+8. Merge both complete model result trees and run the predeclared
+   `DR-ANALYSIS-001` statistical analysis without reopening image pixels.
 
 No dataset count, accuracy, confidence interval, p-value or stability result is fabricated by this repository.

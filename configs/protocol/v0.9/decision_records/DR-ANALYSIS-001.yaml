@@ -1,0 +1,159 @@
+decision_id: DR-ANALYSIS-001
+title: Predeclared official-test statistical analysis plan
+status: approved
+decision_type: official_test_statistical_analysis
+approved_at_utc: 2026-07-24
+approved_by: project_owner
+
+source_merges:
+  resnet50:
+    report_sha256: 32610c640f3f35455bcdd998a3f0bb1a09eac2ff34f40dcdb51c0d86e8ac7c1e
+    prediction_row_count: 20316
+    joint_row_count: 60948
+  efficientnet_b0:
+    report_sha256: 0cc81bef79c9bf273eff753eef74fa737d35d6b8abef7951acd3fa2e6d534401
+    prediction_row_count: 20316
+    joint_row_count: 60948
+
+scientific_lineage:
+  campaign_id: plantxai-official-test-v1
+  governance_protocol_hash: ceaef8a293b877c61a81f046dbcca5ec9abdf7092c38e43fb1aa6225e76d8b02
+  checkpoint_training_protocol_hash: 7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b
+  manifest_sha256: 323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894
+  historical_final_freeze_record_sha256: aed2e96afd2749250d4151780bb4002d198eb96d7433d2bef5b03d4a6ac9212d
+  official_test_sample_count: 1693
+  official_test_leaf_count: 770
+  official_test_sample_ids_sha256: 585529885e825889f83ee13b0746d5e9bf665f5ac2363becfeae64444a5b53cd
+
+analysis_scope:
+  models:
+    - resnet50
+    - efficientnet_b0
+  scenario_ids:
+    - rotation_mild
+    - rotation_moderate
+    - rotation_severe
+    - brightness_mild
+    - brightness_moderate
+    - brightness_severe
+    - gaussian_noise_mild
+    - gaussian_noise_moderate
+    - gaussian_noise_severe
+    - gaussian_blur_mild
+    - gaussian_blur_moderate
+    - gaussian_blur_severe
+  xai_methods:
+    - grad_cam
+    - grad_cam_plus_plus
+    - score_cam
+  severity_interpretation: ordinal_within_transformation_only
+  rotation_prediction_claim_scope: zero_filled_operator_specific
+  xai_alignment_policy: forward_align_original_cam
+  valid_region_policy: geometric_support_mask
+
+endpoints:
+  rq1_primary:
+    - is_consistent
+    - transformed_is_correct
+    - confidence_drop
+  rq1_secondary_descriptive:
+    - absolute_confidence_delta
+  rq2_primary:
+    - pearson
+    - ssim
+    - topk_iou_20
+  rq2_secondary_descriptive:
+    - cosine
+    - topk_iou_10
+    - topk_iou_30
+  rq3_exploratory:
+    predictor: confidence_drop
+    outcomes:
+      - pearson
+      - ssim
+      - topk_iou_20
+    hypothesis_testing: false
+
+reporting_strata:
+  rq1_bootstrap_intervals: model_by_scenario
+  rq1_class_strata: descriptive_point_estimates_without_hypothesis_tests
+  rq2_bootstrap_intervals: model_by_xai_method_by_scenario
+  rq2_exclusion_audit: model_by_xai_method_by_scenario_by_reason
+  rq3_association: >-
+    model_by_xai_method_by_transformation_after_pooling_the_three_severities
+    and_aggregating_to_leaf_means
+
+statistical_policy:
+  bootstrap_unit: leaf_id
+  bootstrap_iterations: 10000
+  confidence_level: 0.95
+  base_seed: 42
+  group_seed_derivation: sha256_base_seed_and_group_id
+  paired_key: sample_id
+  inferential_unit: leaf_id
+  within_leaf_aggregation: arithmetic_mean_after_common_sample_intersection
+  paired_test: wilcoxon_two_sided
+  zero_method: pratt
+  effect_size: rank_biserial
+  correction: holm
+  alpha: 0.05
+  minimum_paired_leaf_count: 20
+
+holm_families:
+  rq1_model:
+    family: one_family_per_primary_endpoint
+    members: twelve_scenario_specific_resnet50_vs_efficientnet_b0_contrasts
+  rq2_model:
+    family: one_family_per_primary_metric_and_xai_method
+    members: twelve_scenario_specific_resnet50_vs_efficientnet_b0_contrasts
+  rq2_method:
+    family: one_family_per_model_primary_metric_and_scenario
+    members: three_pairwise_xai_method_contrasts
+  rq2_severity:
+    family: one_family_per_model_xai_method_primary_metric_and_transformation
+    members: mild_vs_moderate_mild_vs_severe_and_moderate_vs_severe
+
+missingness_and_exclusion:
+  prediction_rows: complete_factorial_required
+  xai_valid_row: prediction_consistent_and_empty_exclusion_reason_and_finite_metrics
+  common_pair_policy: exact_intersection_before_within_leaf_aggregation
+  excluded_rows_retained_in_audit: true
+  imputation: prohibited
+  minimum_valid_pair_failure: fail_closed
+
+outputs:
+  artifacts:
+    - prediction_summary.csv
+    - prediction_class_summary.csv
+    - xai_summary.csv
+    - xai_exclusion_audit.csv
+    - paired_comparisons.csv
+    - rq3_association_summary.csv
+    - official_analysis_report.json
+  expected_fixed_row_counts:
+    prediction_summary.csv: 96
+    prediction_class_summary.csv: 480
+    xai_summary.csv: 432
+    paired_comparisons.csv: 576
+    rq3_association_summary.csv: 72
+
+prohibitions:
+  official_test_pixel_access: prohibited
+  checkpoint_reselection: prohibited
+  model_or_hyperparameter_tuning: prohibited
+  transformation_tuning: prohibited
+  xai_method_tuning: prohibited
+  endpoint_or_holm_family_changes_after_result_inspection: prohibited
+  selective_exclusion_or_imputation: prohibited
+
+decision: >-
+  Authorize one fail-closed statistical analysis of the two exact merged
+  official-test result trees. The analysis is descriptive and inferential only;
+  it must not decode dataset images and must not use official-test observations
+  to reselect or tune any model, transformation, XAI method or protocol choice.
+
+project_owner_approval: >-
+  Tôi phê duyệt tạo DR-ANALYSIS-001 dựa trên hai merge report SHA đã xác minh.
+  Cho phép triển khai trình phân tích thống kê fail-closed theo protocol đã
+  khóa; không sử dụng kết quả official test để lựa chọn hoặc tinh chỉnh hệ
+  thống.
