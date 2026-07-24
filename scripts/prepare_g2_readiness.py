@@ -42,11 +42,11 @@ def main() -> int:
     governance = resolved.values["governance"]
     if not (
         governance.get("G1_CHECKPOINT_SELECTION") == "pass"
-        and governance.get("G2_TEST_EVALUATION_READY") == "blocked"
+        and governance.get("G2_TEST_EVALUATION_READY") in {"pending", "blocked"}
         and governance.get("official_test_evaluation_allowed") is False
     ):
         raise SystemExit(
-            "G2 readiness requires G1 PASS while G2 and official test remain blocked"
+            "G2 readiness requires G1 PASS while G2 is not approved and official test remains disabled"
         )
     manifest_sha256 = sha256_file(args.manifest)
     freeze_record = require_frozen_artifacts(args.manifest)
@@ -144,7 +144,8 @@ def main() -> int:
         "official_test_sample_ids_unique": len(test_sample_ids)
         == len(set(test_sample_ids)),
         "official_test_pixels_accessed": False,
-        "g2_remains_blocked": governance["G2_TEST_EVALUATION_READY"] == "blocked",
+        "g2_remains_not_approved": governance["G2_TEST_EVALUATION_READY"]
+        in {"pending", "blocked"},
         "official_test_evaluation_remains_disabled": governance[
             "official_test_evaluation_allowed"
         ]
