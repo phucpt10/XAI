@@ -4,14 +4,14 @@ PlantXAI-Stability is research software for evaluating prediction robustness and
 
 The current implemented architecture, module boundaries, governed workflows,
 experimental pipeline, artifact contracts and operational design are documented
-in [`PlantXAI-Stability_Architecture_v1.0.docx`](PlantXAI-Stability_Architecture_v1.0.docx).
+in [`PlantXAI-Stability_Architecture_v1.0.md`](PlantXAI-Stability_Architecture_v1.0.md).
 G2 authorizes one registered official-test campaign after validation-only
 checkpoint selection and metadata-only readiness review. Every runner remains
 fail-closed until the runtime authorization chain passes.
 
 ## System architecture
 
-`PlantXAI-Stability_Architecture_v1.0.docx` is the single current English
+`PlantXAI-Stability_Architecture_v1.0.md` is the single current English
 architecture specification for this repository. It covers:
 
 - configuration, governance and fail-closed authorization;
