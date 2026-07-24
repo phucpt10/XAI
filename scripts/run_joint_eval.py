@@ -17,7 +17,7 @@ import numpy as np
 
 from plantxai_stability import __version__
 from plantxai_stability.artifacts import atomic_json
-from plantxai_stability.config import load_protocol
+from plantxai_stability.config import load_protocol, resolve_xai_target_layer
 from plantxai_stability.data.loader import load_verified_record, preprocess_for_model
 from plantxai_stability.inference import infer_one
 from plantxai_stability.joint_execution import (
@@ -137,6 +137,9 @@ def main() -> int:
             "rotation_prediction_claim_scope",
         )
     }
+    bound_xai_policy["target_layer"] = resolve_xai_target_layer(
+        xai_policy, args.model_id, args.xai_method
+    )
     identity = build_run_identity(
         run_id=args.run_id,
         model_id=args.model_id,
@@ -187,7 +190,7 @@ def main() -> int:
     )
     model = wrapper.model.to(args.device)
     model.eval()
-    target_layer = wrapper.target_layer()
+    target_layer = wrapper.target_layer(bound_xai_policy["target_layer"])
     pipeline = TransformationPipeline(
         resolved.seed, resolved.values["transformations"]["parameters"]
     )

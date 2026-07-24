@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from plantxai_stability.config import load_protocol
+from plantxai_stability.config import load_protocol, resolve_xai_target_layer
 
 
 def test_protocol_is_frozen_and_g2_approved_with_runtime_gate_required() -> None:
@@ -63,6 +63,24 @@ def test_protocol_rejects_pending_xai_target_layer(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="runtime-approved XAI target layer"):
         load_protocol(candidate)
+
+
+def test_method_specific_target_layers_are_resolved(tmp_path: Path) -> None:
+    source = Path("configs/protocol/v0.9/protocol.yaml")
+    values = yaml.safe_load(source.read_text(encoding="utf-8"))
+    values["xai"]["target_layers"]["efficientnet_b0"] = {
+        "grad_cam": "features[-1]",
+        "grad_cam_plus_plus": "features[-1]",
+        "score_cam": "features[-2]",
+    }
+    candidate = tmp_path / "protocol.yaml"
+    candidate.write_text(yaml.safe_dump(values, sort_keys=False), encoding="utf-8")
+
+    config = load_protocol(candidate)
+    assert (
+        resolve_xai_target_layer(config.values["xai"], "efficientnet_b0", "score_cam")
+        == "features[-2]"
+    )
 
 
 def test_frozen_protocol_requires_severity_evidence(tmp_path: Path) -> None:

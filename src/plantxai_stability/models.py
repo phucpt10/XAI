@@ -46,12 +46,20 @@ class ModelWrapper:
             raise ValueError(f"Unsupported model_id: {self.model_id}")
         return model
 
-    def target_layer(self) -> Any:
-        if self.model_id == "resnet50":
+    def target_layer(self, specification: str | None = None) -> Any:
+        default = (
+            "layer4[-1]" if self.model_id == "resnet50" else "features[-1]"
+        )
+        requested = specification or default
+        if self.model_id == "resnet50" and requested == "layer4[-1]":
             return self.model.layer4[-1]
-        if self.model_id == "efficientnet_b0":
+        if self.model_id == "efficientnet_b0" and requested == "features[-1]":
             return self.model.features[-1]
-        raise ValueError(f"Unsupported model_id: {self.model_id}")
+        if self.model_id == "efficientnet_b0" and requested == "features[-2]":
+            return self.model.features[-2]
+        raise ValueError(
+            f"Unsupported target layer {requested!r} for {self.model_id}"
+        )
 
     def eval(self) -> None:
         self.model.eval()

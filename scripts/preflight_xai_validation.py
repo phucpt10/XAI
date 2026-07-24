@@ -19,7 +19,7 @@ from typing import Any
 import numpy as np
 import yaml
 
-from plantxai_stability.config import load_protocol
+from plantxai_stability.config import load_protocol, resolve_xai_target_layer
 from plantxai_stability.data.loader import load_verified_record, preprocess_for_model
 from plantxai_stability.data.manifest import read_manifest_csv
 from plantxai_stability.models import ModelWrapper
@@ -46,7 +46,7 @@ def main() -> int:
     parser.add_argument(
         "--efficientnet-scorecam-target-layer",
         choices=("features[-1]", "features[-2]"),
-        default="features[-1]",
+        default=None,
         help=(
             "Validation-only candidate override. It must be backed by a new "
             "Decision Record before an official run."
@@ -104,9 +104,10 @@ def main() -> int:
         load_checkpoint(wrapper, checkpoint, args.device)
         model = wrapper.model.to(args.device)
         model.eval()
-        target_layer, target_layer_name = _score_cam_target_layer(
-            wrapper, args.efficientnet_scorecam_target_layer
+        target_layer_name = args.efficientnet_scorecam_target_layer or resolve_xai_target_layer(
+            resolved.values["xai"], model_id, "score_cam"
         )
+        target_layer = wrapper.target_layer(target_layer_name)
         generator = CAMGenerator(model, target_layer, "score_cam")
         try:
             generator.__enter__()
@@ -140,7 +141,12 @@ def main() -> int:
         "xai_method": "score_cam",
         "target_layers": {
             "resnet50": "layer4[-1]",
-            "efficientnet_b0": args.efficientnet_scorecam_target_layer,
+            "efficientnet_b0": (
+                args.efficientnet_scorecam_target_layer
+                or resolve_xai_target_layer(
+                    resolved.values["xai"], "efficientnet_b0", "score_cam"
+                )
+            ),
         },
         "scenario_id": args.scenario_id,
         "target_class_policy": "original_predicted_class",
@@ -187,16 +193,6 @@ def _require_validation_bundle(manifest: Path) -> None:
         raise SystemExit("Validation manifest hash does not match recovery report")
     if report.get("freeze_record_sha256") != sha256_file(freeze_path):
         raise SystemExit("Freeze record hash does not match recovery report")
-
-
-def _score_cam_target_layer(
-    wrapper: ModelWrapper, efficientnet_scorecam_target_layer: str
-) -> tuple[Any, str]:
-    if wrapper.model_id == "resnet50":
-        return wrapper.target_layer(), "layer4[-1]"
-    if efficientnet_scorecam_target_layer == "features[-1]":
-        return wrapper.model.features[-1], "features[-1]"
-    return wrapper.model.features[-2], "features[-2]"
 
 
 def _evaluate_record(record: Any, image_root: Path, model: Any, generator: CAMGenerator,

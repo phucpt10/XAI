@@ -128,13 +128,21 @@ def _validate_protocol(values: dict[str, Any]) -> None:
     missing_target_layers = set(values["models"]).difference(target_layers)
     if missing_target_layers:
         raise ValueError(f"XAI target layers missing for models: {sorted(missing_target_layers)}")
-    if any(
-        not isinstance(target_layers[model_id], str)
-        or not target_layers[model_id].strip()
-        or target_layers[model_id].startswith("PENDING_")
-        for model_id in values["models"]
-    ):
-        raise ValueError("Every model requires a runtime-approved XAI target layer")
+    for model_id in values["models"]:
+        configured = target_layers[model_id]
+        if isinstance(configured, str):
+            _validate_target_layer_specification(configured)
+            continue
+        if not isinstance(configured, dict):
+            raise ValueError("Every model requires a runtime-approved XAI target layer")
+        missing_methods = set(xai.get("methods", [])).difference(configured)
+        if missing_methods:
+            raise ValueError(
+                f"XAI target layers missing methods for {model_id}: "
+                f"{sorted(missing_methods)}"
+            )
+        for method in xai["methods"]:
+            _validate_target_layer_specification(configured[method])
     transformations = values["transformations"]
     if (
         transformations.get("algorithm_version")
@@ -187,3 +195,27 @@ def _validate_protocol(values: dict[str, Any]) -> None:
         raise ValueError("statistics.bootstrap_unit must be leaf_id")
     if stats.get("correction") != "holm":
         raise ValueError("Only the declared Holm correction is allowed")
+
+
+def _validate_target_layer_specification(value: Any) -> None:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or value.startswith("PENDING_")
+    ):
+        raise ValueError("Every model requires a runtime-approved XAI target layer")
+
+
+def resolve_xai_target_layer(
+    xai_policy: dict[str, Any], model_id: str, xai_method: str
+) -> str:
+    """Return the frozen target-layer specification for one model/method pair."""
+    configured = xai_policy["target_layers"][model_id]
+    if isinstance(configured, str):
+        return configured
+    try:
+        return str(configured[xai_method])
+    except KeyError as exc:
+        raise ValueError(
+            f"No target layer configured for {model_id}/{xai_method}"
+        ) from exc

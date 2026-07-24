@@ -1,0 +1,38 @@
+decision_id: DR-XAI-003
+title: Method-specific target-layer mapping after validation-only Score-CAM investigation
+status: approved
+decision_type: xai_configuration
+approved_at_utc: 2026-07-25
+approved_by: project_owner
+supersedes:
+  decision_id: DR-XAI-002
+  scope: EfficientNet-B0 Score-CAM target layer only
+decision:
+  resnet50: {grad_cam: "layer4[-1]", grad_cam_plus_plus: "layer4[-1]", score_cam: "layer4[-1]"}
+  efficientnet_b0: {grad_cam: "features[-1]", grad_cam_plus_plus: "features[-1]", score_cam: "features[-2]"}
+rationale:
+  - "EfficientNet-B0 Score-CAM at features[-1] produced 48 constant original heatmaps out of 100 validation leaves."
+  - "At features[-2], Score-CAM produced 100 valid original heatmaps out of 100 on the identical leaf-balanced validation sample."
+  - "The candidate preflight at features[-2] produced zero original and zero transformed CAM failures across 200 model-sample rows."
+validation_evidence:
+  split: validation_only
+  test_split_accessed: false
+  leaf_balanced_sample_count: 100
+  scenario: gaussian_blur_severe
+  candidate_diagnostic:
+    artifact: efficientnet_cam_layer_diagnostic_summary.json
+    score_cam_features_minus_1_valid_count: 52
+    score_cam_features_minus_2_valid_count: 100
+    grad_cam_features_minus_1_valid_count: 100
+    grad_cam_plus_plus_features_minus_1_valid_count: 100
+  candidate_preflight:
+    artifact: score_cam_preflight_report.json
+    sample_rows: 200
+    original_cam_failure_count: 0
+    transformed_cam_failure_count: 0
+    score_cam_samples_sha256: d1d4d5d05bf6b55f60cf8f3a26c2d571f93bb8c2c6458eabb21ca62eab988700
+governance_effect:
+  protocol_successor: v1.1
+  G2_TEST_EVALUATION_READY: pending
+  official_test_access: prohibited_until_DR_TEST_002_is_satisfied
+project_owner_approval: Approved mapping for protocol v1.1; no test pixels were accessed.
