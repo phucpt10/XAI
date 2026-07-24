@@ -16,10 +16,9 @@ from plantxai_stability.config import load_protocol
 from plantxai_stability.data.freeze import require_frozen_artifacts
 from plantxai_stability.data.manifest import read_manifest_csv
 from plantxai_stability.data.splits import validate_frozen_splits
-from plantxai_stability.governance import approved_checkpoint_lineage
 from plantxai_stability.provenance import sha256_file
 from plantxai_stability.test_authorization import (
-    validate_g2_authorization,
+    authorize_official_test_run,
     validate_official_test_metadata,
 )
 
@@ -31,6 +30,8 @@ def main() -> int:
     parser.add_argument("--checkpoint-decision-record", type=Path, required=True)
     parser.add_argument("--test-decision-record", type=Path, required=True)
     parser.add_argument("--g2-readiness-report", type=Path, required=True)
+    parser.add_argument("--recovery-decision-record", type=Path)
+    parser.add_argument("--recovery-binding-report", type=Path)
     parser.add_argument("--resnet50-checkpoint", type=Path, required=True)
     parser.add_argument("--efficientnet-b0-checkpoint", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -40,10 +41,16 @@ def main() -> int:
             "G2 authorization output exists; use a new versioned directory"
         )
     resolved = load_protocol(args.protocol)
+    if (args.recovery_decision_record is None) != (
+        args.recovery_binding_report is None
+    ):
+        raise SystemExit(
+            "--recovery-decision-record and --recovery-binding-report must be supplied together"
+        )
     manifest_sha256 = sha256_file(args.manifest)
     require_frozen_artifacts(args.manifest)
     freeze_path = args.manifest.parent / "freeze_record.json"
-    freeze_record_sha256 = sha256_file(freeze_path)
+    physical_freeze_record_sha256 = sha256_file(freeze_path)
     checkpoint_decision = _load_yaml(args.checkpoint_decision_record)
     test_decision = _load_yaml(args.test_decision_record)
     readiness_report = json.loads(
@@ -54,40 +61,35 @@ def main() -> int:
         for name in resolved.values["transformations"]["names"]
         for severity in resolved.values["transformations"]["severities"]
     ]
-    authorization = validate_g2_authorization(
-        governance=resolved.values["governance"],
-        governance_protocol_hash=resolved.sha256,
-        declared_models=resolved.values["models"],
-        declared_scenarios=scenarios,
-        declared_xai_methods=resolved.values["xai"]["methods"],
-        test_decision=test_decision,
-        readiness_report=readiness_report,
-        readiness_report_sha256=sha256_file(args.g2_readiness_report),
-        checkpoint_decision=checkpoint_decision,
-        checkpoint_decision_sha256=sha256_file(args.checkpoint_decision_record),
-        manifest_sha256=manifest_sha256,
-        freeze_record_sha256=freeze_record_sha256,
-    )
+    # Use the same authorization routine as the pixel-opening runner.  It
+    # validates a governed recovery binding when the physical freeze differs
+    # from the historical checkpoint lineage, without loading image pixels.
+    authorizations = {
+        model_id: authorize_official_test_run(
+            resolved,
+            manifest_path=args.manifest,
+            checkpoint_path=checkpoint_path,
+            model_id=model_id,
+            checkpoint_decision_path=args.checkpoint_decision_record,
+            test_decision_path=args.test_decision_record,
+            readiness_report_path=args.g2_readiness_report,
+            recovery_decision_path=args.recovery_decision_record,
+            recovery_binding_report_path=args.recovery_binding_report,
+        )
+        for model_id, checkpoint_path in {
+            "resnet50": args.resnet50_checkpoint,
+            "efficientnet_b0": args.efficientnet_b0_checkpoint,
+        }.items()
+    }
+    authorization = authorizations["resnet50"]
+    freeze_record_sha256 = authorization["freeze_record_sha256"]
     records = read_manifest_csv(args.manifest)
     validate_frozen_splits(records)
     test_identity = validate_official_test_metadata(records, test_decision)
-    checkpoint_paths = {
-        "resnet50": args.resnet50_checkpoint,
-        "efficientnet_b0": args.efficientnet_b0_checkpoint,
+    checkpoint_hashes = {
+        model_id: details["checkpoint_sha256"]
+        for model_id, details in authorizations.items()
     }
-    checkpoint_hashes: dict[str, str] = {}
-    for model_id, checkpoint_path in checkpoint_paths.items():
-        checkpoint_sha256 = sha256_file(checkpoint_path)
-        approved_checkpoint_lineage(
-            checkpoint_decision,
-            resolved.values["governance"],
-            model_id=model_id,
-            declared_models=resolved.values["models"],
-            checkpoint_sha256=checkpoint_sha256,
-            manifest_sha256=manifest_sha256,
-            freeze_record_sha256=freeze_record_sha256,
-        )
-        checkpoint_hashes[model_id] = checkpoint_sha256
     report = {
         "run_type": "metadata_only_g2_authorization_verification",
         "authorization_status": "AUTHORIZED_NOT_EXECUTED",
@@ -107,6 +109,8 @@ def main() -> int:
         ],
         "manifest_sha256": manifest_sha256,
         "freeze_record_sha256": freeze_record_sha256,
+        "physical_freeze_record_sha256": physical_freeze_record_sha256,
+        "recovery_lineage": authorization["recovery_lineage"],
         "checkpoint_sha256": checkpoint_hashes,
         "official_test_identity": test_identity,
         "registered_scenario_ids": scenarios,
