@@ -1,0 +1,77 @@
+decision_id: DR-TEST-003
+title: Authorization of the protocol v1.4 corrected official-test campaign
+status: approved
+decision_type: g2_official_test_evaluation_authorization
+approved_at_utc: 2026-07-25
+approved_by: project_owner
+supersedes:
+  decision_id: DR-TEST-002
+  scope: G2 authorization after v1.x validation and metadata gates
+
+readiness_evidence:
+  report_sha256: 7b561a856737042a56ac7af5098bcded01eaa85251cd5fb3c2399f02d00d28f3
+  run_type: metadata_only_g2_readiness
+  technical_gate_passed: true
+  approval_status_before_decision: pending_g2_human_review
+  readiness_git_commit: 4fd6bd8275c52edc8dda792c0a13d96b7a55c5d3
+  g1_governance_protocol_hash: edca7ddba3bc30408f0c3fa7cef7bce83705f86f64b0510c2bb60efb85d02923
+  checkpoint_training_protocol_hash: 7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b
+  checkpoint_decision_record_id: DR-CHECKPOINT-004
+  checkpoint_decision_record_sha256: 47a1a44b0728a2e22a67d15208b56f366b1c5b2b011c5b066010c4a853b2d494
+  manifest_sha256: 323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894
+  freeze_record_sha256: aed2e96afd2749250d4151780bb4002d198eb96d7433d2bef5b03d4a6ac9212d
+  split_summary_sha256: 3d6ffc612107ebdbb947e6e8c23b1a5b17d4b033a226349efc91e66c05d5751a
+  official_test_pixels_accessed: false
+  official_test_result_computed: false
+  recovery_binding:
+    decision_id: DR-RECOVERY-001
+    report_sha256: acd2f6414f84b9d0d9c6b93771758c27e0ee168ab48da2f81d295dd0647697b1
+    physical_freeze_record_sha256: fae10b780f839acf923cc42995e63ff199ef78176e7185b1fb887fe6de8bc26f
+
+official_test_identity:
+  sample_count: 1693
+  leaf_count: 770
+  sample_ids_sha256: 585529885e825889f83ee13b0746d5e9bf665f5ac2363becfeae64444a5b53cd
+  leaf_ids_sha256: c4a8de4c039f3a3dde33894fadcdf380340be90e6fc56e6669c3b481052d052a
+  source_membership_preserved_exactly: true
+
+registered_campaign:
+  campaign_id: plantxai-official-test-v1
+  models: [resnet50, efficientnet_b0]
+  evaluation_components: [baseline_prediction, joint_prediction_robustness_and_xai_stability]
+  scenario_ids: [rotation_mild, rotation_moderate, rotation_severe, brightness_mild, brightness_moderate, brightness_severe, gaussian_noise_mild, gaussian_noise_moderate, gaussian_noise_severe, gaussian_blur_mild, gaussian_blur_moderate, gaussian_blur_severe]
+  xai_methods: [grad_cam, grad_cam_plus_plus, score_cam]
+  xai_alignment_policy: forward_align_original_cam
+  valid_region_policy: geometric_support_mask
+  target_class_policy: original_predicted_class
+  prediction_consistency_required: true
+  rotation_prediction_claim_scope: zero_filled_operator_specific
+  severity_comparison_scope: within_transformation_only
+
+approved_checkpoints:
+  resnet50: b508abd2851c5f576131db0e47447624cd78f1e3204c2931f7928c266f0c7bfc
+  efficientnet_b0: 05b592f1ff7f4f2b4a757ae2564a088e3742555e20110ee33d19e563ff2fe60b
+
+execution_policy:
+  one_registered_campaign: true
+  immutable_versioned_outputs: true
+  no_overwrite: true
+  no_checkpoint_reselection_after_test: true
+  no_model_or_hyperparameter_tuning_after_test: true
+  no_transformation_or_xai_tuning_after_test: true
+  infrastructure_retry_policy: "Only an identical protocol, checkpoint, manifest, seed, scenario and method identity may resume or retry; every retry is recorded."
+  runtime_authorization_requirement: "Every runner validates this record, G2 readiness, DR-CHECKPOINT-004 and recovery binding before opening any official-test image."
+
+governance_effect:
+  governance_protocol_hash: d0957584353cf036d6dde0aec510da7cf9661752540c7169e55f95791233801e
+  G2_TEST_EVALUATION_READY: pass
+  test_evaluation_blockers: []
+  official_experiment_allowed: true
+  official_test_evaluation_allowed: true
+  operational_state: approved_pending_runtime_authorization_gate_verification
+
+decision: >-
+  Authorize exactly one corrected protocol v1.4 official-test campaign. The
+  campaign may not use test observations to change checkpoints, models,
+  hyperparameters, transformations, target layers or XAI methods.
+project_owner_approval: Approved after the v1.3 metadata-only G2 readiness PASS; test pixels were not accessed before this decision.
