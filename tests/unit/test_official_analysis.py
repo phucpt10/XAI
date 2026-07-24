@@ -169,7 +169,7 @@ def test_cluster_bootstrap_is_deterministic_and_uses_leaf_units() -> None:
     assert left == right
     assert left["metric_a"]["n_leaf"] == 3
     assert left["metric_a"]["n_value"] == 4
-    assert left["metric_a"]["estimate"] == 0.625
+    assert left["metric_a"]["estimate"] == pytest.approx(2.0 / 3.0)
 
 
 def test_paired_contrast_uses_common_samples_then_leaf_means() -> None:

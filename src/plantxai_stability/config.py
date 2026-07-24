@@ -138,7 +138,10 @@ def _validate_protocol(values: dict[str, Any]) -> None:
     transformations = values["transformations"]
     if (
         transformations.get("algorithm_version")
-        != "shared_randomization_zero_fill_valid_mask_v6"
+        not in {
+            "shared_randomization_zero_fill_valid_mask_v6",
+            "shared_randomization_zero_fill_valid_mask_v7",
+        }
     ):
         raise ValueError("Unsupported transformation algorithm version")
     expected_xai_policy = {

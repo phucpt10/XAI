@@ -43,8 +43,31 @@ def main() -> int:
     if args.output_dir.exists():
         raise SystemExit("Severity pilot output already exists; use a new versioned directory")
     resolved = load_protocol(args.protocol)
-    freeze_record = require_frozen_artifacts(args.manifest)
-    all_records = read_manifest_csv(args.manifest)
+    validation_bundle_report = args.manifest.parent / "validation_bundle_manifest.json"
+    if validation_bundle_report.is_file():
+        bundle = json.loads(validation_bundle_report.read_text(encoding="utf-8"))
+        required_bundle_state = {
+            "run_type": "validation_only_recovery_bundle",
+            "validation_only_manifest": True,
+            "non_validation_entries_materialized": False,
+            "all_validation_images_canonical_hash_verified": True,
+        }
+        if any(bundle.get(key) != value for key, value in required_bundle_state.items()):
+            raise SystemExit("Validation bundle provenance is not acceptable")
+        if bundle.get("validation_manifest_sha256") != sha256_file(args.manifest):
+            raise SystemExit("Validation bundle manifest hash mismatch")
+        freeze_path = args.manifest.parent / "freeze_record.json"
+        if not freeze_path.is_file() or bundle.get("freeze_record_sha256") != sha256_file(freeze_path):
+            raise SystemExit("Validation bundle freeze record hash mismatch")
+        freeze_record = json.loads(freeze_path.read_text(encoding="utf-8"))
+        all_records = read_manifest_csv(args.manifest)
+        if any(record.split != "validation" for record in all_records):
+            raise SystemExit("Validation bundle manifest contains a non-validation record")
+        bundle_mode = True
+    else:
+        freeze_record = require_frozen_artifacts(args.manifest)
+        all_records = read_manifest_csv(args.manifest)
+        bundle_mode = False
     validation_records = [record for record in all_records if record.split == "validation"]
     if not validation_records:
         raise SystemExit("Frozen manifest contains no validation records")
@@ -201,6 +224,10 @@ def main() -> int:
         "protocol_hash": resolved.sha256,
         "transformation_algorithm_version": TRANSFORMATION_ALGORITHM_VERSION,
         "frozen_manifest_sha256": sha256_file(args.manifest),
+        "validation_bundle_mode": bundle_mode,
+        "validation_bundle_report_sha256": (
+            sha256_file(validation_bundle_report) if bundle_mode else ""
+        ),
         "freeze_record_protocol_hash": freeze_record.get("protocol_hash"),
         "freeze_protocol_hash_matches_current": (
             freeze_record.get("protocol_hash") == resolved.sha256

@@ -573,26 +573,23 @@ def cluster_bootstrap_means(
     if frame.empty or frame["leaf_id"].isna().any():
         raise ValueError("Bootstrap data must have resolved leaf identities")
     grouped = frame.groupby("leaf_id", sort=True)[list(value_columns)]
-    leaf_sums = grouped.sum().to_numpy(dtype=float)
-    leaf_counts = grouped.size().to_numpy(dtype=float)
+    leaf_means = grouped.mean().to_numpy(dtype=float)
     values = frame[list(value_columns)].to_numpy(dtype=float)
     if not np.isfinite(values).all():
         raise ValueError("Bootstrap endpoints contain NaN or Inf")
     rng = np.random.default_rng(seed)
     estimates = np.empty((iterations, len(value_columns)), dtype=float)
-    n_leaf = len(leaf_counts)
+    n_leaf = len(leaf_means)
     chunk_size = 256
     for start in range(0, iterations, chunk_size):
         stop = min(start + chunk_size, iterations)
         sampled = rng.integers(0, n_leaf, size=(stop - start, n_leaf))
-        sampled_sums = leaf_sums[sampled].sum(axis=1)
-        sampled_counts = leaf_counts[sampled].sum(axis=1)
-        estimates[start:stop] = sampled_sums / sampled_counts[:, None]
+        estimates[start:stop] = leaf_means[sampled].mean(axis=1)
     alpha = (1.0 - confidence_level) / 2.0
     output: dict[str, dict[str, float | int]] = {}
     for index, column in enumerate(value_columns):
         output[column] = {
-            "estimate": float(values[:, index].mean()),
+            "estimate": float(leaf_means[:, index].mean()),
             "lower": float(np.quantile(estimates[:, index], alpha)),
             "upper": float(np.quantile(estimates[:, index], 1.0 - alpha)),
             "n_leaf": int(n_leaf),
@@ -921,6 +918,11 @@ def _paired_contrast(
             "wilcoxon_statistic": "",
             "p_value_raw": "",
             "rank_biserial": "",
+            "wilcoxon_n_zero_differences": "",
+            "wilcoxon_n_unique_absolute_nonzero_differences": "",
+            "wilcoxon_method": "",
+            "wilcoxon_zero_method": "",
+            "wilcoxon_continuity_correction": "",
         }
     left_values = leaf[f"{endpoint}_left"].to_numpy(dtype=float)
     right_values = leaf[f"{endpoint}_right"].to_numpy(dtype=float)
@@ -940,6 +942,13 @@ def _paired_contrast(
         "wilcoxon_statistic": result["statistic"],
         "p_value_raw": result["p_value"],
         "rank_biserial": result["rank_biserial"],
+        "wilcoxon_n_zero_differences": result["n_zero_differences"],
+        "wilcoxon_n_unique_absolute_nonzero_differences": result[
+            "n_unique_absolute_nonzero_differences"
+        ],
+        "wilcoxon_method": result["method"],
+        "wilcoxon_zero_method": result["zero_method"],
+        "wilcoxon_continuity_correction": result["continuity_correction"],
     }
 
 

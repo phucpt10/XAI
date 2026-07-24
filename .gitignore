@@ -12,6 +12,8 @@ data/raw/
 data/cache/
 outputs/
 checkpoints/
+.private-data/
+.private-review/
 *.pt
 *.pth
 *.ckpt

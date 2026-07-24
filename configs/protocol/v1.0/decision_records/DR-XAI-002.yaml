@@ -1,0 +1,16 @@
+decision_id: DR-XAI-002
+title: XAI target-layer retention with mandatory Score-CAM preflight
+status: approved
+decision_type: xai_configuration
+approved_at_utc: 2026-07-24
+approved_by: project_owner
+target_layers: {resnet50: "layer4[-1]", efficientnet_b0: "features[-1]"}
+methods: [grad_cam, grad_cam_plus_plus, score_cam]
+required_preflight:
+  split: validation_only
+  target_class_trace_required: true
+  sample_level_original_cam_status_required: true
+  sample_level_transformed_cam_status_required: true
+  constant_cam_rate_must_be_reported: true
+  failure_stops_official_test_access: true
+project_owner_approval: Target layers are retained subject to the required validation-only preflight.

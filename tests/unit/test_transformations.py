@@ -150,3 +150,22 @@ def test_gaussian_noise_uses_shared_standard_field() -> None:
     standardized = [(output - pixels) / scenario.parameters["sigma"] for output, scenario in zip(outputs, scenarios)]
     assert np.allclose(standardized[0], standardized[1], atol=5e-6)
     assert np.allclose(standardized[0], standardized[2], atol=5e-6)
+
+
+def test_gaussian_blur_uses_both_kernel_size_and_sigma() -> None:
+    pixels = np.zeros((21, 21, 3), dtype=np.float32)
+    pixels[10, 10] = 1.0
+    narrow = TransformationPipeline._blur(pixels, kernel_size=3, sigma=1.0)
+    wide = TransformationPipeline._blur(pixels, kernel_size=9, sigma=1.0)
+    diffuse = TransformationPipeline._blur(pixels, kernel_size=9, sigma=3.0)
+    assert not np.array_equal(narrow, wide)
+    assert not np.array_equal(wide, diffuse)
+    assert np.isclose(float(narrow.sum()), float(pixels.sum()), atol=4 / 255)
+
+
+def test_gaussian_blur_rejects_invalid_parameters() -> None:
+    pixels = np.zeros((5, 5, 3), dtype=np.float32)
+    with pytest.raises(ValueError, match="positive odd"):
+        TransformationPipeline._blur(pixels, kernel_size=4, sigma=1.0)
+    with pytest.raises(ValueError, match="finite and positive"):
+        TransformationPipeline._blur(pixels, kernel_size=3, sigma=0.0)

@@ -455,7 +455,9 @@ def _evaluate_sample(
         )
         base_hashes = {
             "original_cam_sha256": original_cam_hash,
+            "original_cam_status": "valid" if original_cam is not None else original_cam_error,
             "transformed_cam_sha256": "",
+            "transformed_cam_status": "not_evaluated",
             "aligned_original_cam_sha256": "",
             "transformation_record_sha256": transformation_sha256,
         }
@@ -516,6 +518,7 @@ def _evaluate_sample(
             hashes = {
                 **base_hashes,
                 "transformed_cam_sha256": _heatmap_sha256(transformed_cam),
+                "transformed_cam_status": "valid",
                 "aligned_original_cam_sha256": _heatmap_sha256(aligned_original),
             }
         except ValueError as exc:

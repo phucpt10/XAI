@@ -12,7 +12,7 @@ import numpy as np
 from plantxai_stability.contracts import TransformationRecord
 
 
-TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_zero_fill_valid_mask_v6"
+TRANSFORMATION_ALGORITHM_VERSION = "shared_randomization_zero_fill_valid_mask_v7"
 
 
 def derive_seed(global_seed: int, sample_id: str, scenario_id: str) -> int:
@@ -54,7 +54,14 @@ class TransformationPipeline:
             noise = float(params.get("mean", 0.0)) + float(params["sigma"]) * standard_noise
             output = np.clip(output + noise, 0.0, 1.0).astype(np.float32)
         elif scenario.transformation == "gaussian_blur":
-            output = self._blur(output, int(params["kernel_size"]), float(params.get("sigma", 1.0)))
+            output = self._blur(
+                output,
+                int(params["kernel_size"]),
+                float(params.get("sigma", 1.0)),
+                str(params["opencv_distribution_version"]),
+            )
+            params["operator"] = "opencv_gaussian_blur"
+            params["border_mode"] = "reflect_101"
         elif scenario.transformation == "rotation":
             angle = float(params["angle_degrees"])
             direction = -1.0 if int(rng.integers(0, 2)) == 0 else 1.0
@@ -90,15 +97,38 @@ class TransformationPipeline:
         return output, record
 
     @staticmethod
-    def _blur(pixels: np.ndarray, kernel_size: int, sigma: float) -> np.ndarray:
+    def _blur(
+        pixels: np.ndarray,
+        kernel_size: int,
+        sigma: float,
+        expected_opencv_distribution_version: str = "4.13.0.92",
+    ) -> np.ndarray:
         try:
-            from PIL import Image, ImageFilter
+            import cv2
         except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("Pillow is required for Gaussian blur") from exc
-        if kernel_size % 2 == 0:
-            raise ValueError("Gaussian blur kernel_size must be odd")
-        image = Image.fromarray(np.uint8(np.clip(pixels, 0, 1) * 255.0))
-        blurred = image.filter(ImageFilter.GaussianBlur(radius=sigma))
+            raise RuntimeError("OpenCV is required for Gaussian blur") from exc
+        if kernel_size <= 0 or kernel_size % 2 == 0:
+            raise ValueError("Gaussian blur kernel_size must be a positive odd integer")
+        if not np.isfinite(sigma) or sigma <= 0.0:
+            raise ValueError("Gaussian blur sigma must be finite and positive")
+        distribution_version = version("opencv-python-headless")
+        if distribution_version != expected_opencv_distribution_version:
+            raise ValueError(
+                "OpenCV distribution version mismatch: "
+                f"expected {expected_opencv_distribution_version}, "
+                f"found {distribution_version}"
+            )
+        cv2.setNumThreads(1)
+        if hasattr(cv2, "ocl"):
+            cv2.ocl.setUseOpenCL(False)
+        source = np.rint(np.clip(pixels, 0.0, 1.0) * 255.0).astype(np.uint8)
+        blurred = cv2.GaussianBlur(
+            source,
+            (kernel_size, kernel_size),
+            sigmaX=sigma,
+            sigmaY=sigma,
+            borderType=cv2.BORDER_REFLECT_101,
+        )
         return np.asarray(blurred, dtype=np.float32) / 255.0
 
     @staticmethod

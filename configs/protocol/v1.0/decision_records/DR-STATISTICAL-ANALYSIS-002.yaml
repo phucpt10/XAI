@@ -1,0 +1,23 @@
+decision_id: DR-STATISTICAL-ANALYSIS-002
+title: Approval of equal-leaf summaries and auditable Wilcoxon diagnostics
+status: approved
+decision_type: statistical_analysis_plan
+approved_at_utc: 2026-07-24
+approved_by: project_owner
+approved_statistical_policy:
+  summary_estimand: equal_leaf_mean
+  bootstrap_unit: leaf_id
+  inferential_unit: leaf_id
+  paired_key: sample_id
+  common_sample_intersection_precedes_leaf_aggregation: true
+  paired_test: wilcoxon_two_sided
+  zero_method: pratt
+  method: asymptotic
+  continuity_correction: false
+  diagnostics: [n_zero_differences, n_unique_absolute_nonzero_differences, method, zero_method, continuity_correction]
+scientific_constraints:
+  image_weighted_and_equal_leaf_estimands_must_not_be_conflated: true
+  all_summary_intervals_must_be_recomputed: true
+  all_paired_comparisons_must_be_recomputed: true
+  holm_families_must_be_predeclared_before_test_access: true
+project_owner_approval: The v1.0 equal-leaf estimand and Wilcoxon provenance requirements are approved.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable
 
 import numpy as np
 
@@ -98,10 +98,23 @@ def _masked_topk_iou(
     mask: np.ndarray,
     fraction: float,
 ) -> float:
-    left_threshold = float(np.quantile(left[mask], 1.0 - fraction))
-    right_threshold = float(np.quantile(right[mask], 1.0 - fraction))
-    left_top = mask & (left >= left_threshold)
-    right_top = mask & (right >= right_threshold)
+    if not 0.0 < fraction <= 1.0:
+        raise ValueError("Top-k fraction must be in (0, 1]")
+    valid_indices = np.flatnonzero(mask.ravel())
+    if valid_indices.size == 0:
+        raise ValueError("Top-k IoU requires a non-empty valid region")
+    k = max(1, int(np.ceil(fraction * valid_indices.size)))
+
+    def select(values: np.ndarray) -> np.ndarray:
+        flat = values.ravel()
+        ranked = np.lexsort((valid_indices, -flat[valid_indices]))
+        chosen = valid_indices[ranked[:k]]
+        selected = np.zeros(mask.size, dtype=bool)
+        selected[chosen] = True
+        return selected.reshape(mask.shape)
+
+    left_top = select(left)
+    right_top = select(right)
     union = int(np.count_nonzero(left_top | right_top))
     if union == 0:
         raise ValueError("Top-k IoU union is empty")
@@ -122,13 +135,14 @@ def bootstrap_leaf_means(
         raise ValueError("Values and leaf_ids must be non-empty and aligned")
     rng = np.random.default_rng(seed)
     by_leaf = {leaf: value_list[leaf_list == leaf] for leaf in unique}
+    leaf_means = np.asarray([by_leaf[leaf].mean() for leaf in unique], dtype=float)
     estimates = np.empty(iterations, dtype=float)
     for index in range(iterations):
         sampled = rng.choice(unique, size=unique.size, replace=True)
-        estimates[index] = np.concatenate([by_leaf[leaf] for leaf in sampled]).mean()
+        estimates[index] = np.asarray([by_leaf[leaf].mean() for leaf in sampled]).mean()
     alpha = (1.0 - confidence_level) / 2.0
     return {
-        "estimate": float(value_list.mean()),
+        "estimate": float(leaf_means.mean()),
         "lower": float(np.quantile(estimates, alpha)),
         "upper": float(np.quantile(estimates, 1.0 - alpha)),
         "n_leaf": int(unique.size),
@@ -147,7 +161,7 @@ def holm_adjust(p_values: Iterable[float]) -> list[float]:
     return adjusted
 
 
-def paired_wilcoxon(x: Iterable[float], y: Iterable[float]) -> dict[str, float]:
+def paired_wilcoxon(x: Iterable[float], y: Iterable[float]) -> dict[str, Any]:
     left = np.asarray(list(x), dtype=float)
     right = np.asarray(list(y), dtype=float)
     if left.size != right.size or left.size == 0:
@@ -161,12 +175,24 @@ def paired_wilcoxon(x: Iterable[float], y: Iterable[float]) -> dict[str, float]:
             "p_value": 1.0,
             "rank_biserial": 0.0,
             "n_pairs": int(left.size),
+            "n_zero_differences": int(left.size),
+            "n_unique_absolute_nonzero_differences": 0,
+            "method": "asymptotic",
+            "zero_method": "pratt",
+            "continuity_correction": False,
         }
     try:
         from scipy.stats import rankdata, wilcoxon
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("SciPy is required for paired Wilcoxon") from exc
-    result = wilcoxon(left, right, zero_method="pratt", alternative="two-sided")
+    result = wilcoxon(
+        left,
+        right,
+        zero_method="pratt",
+        correction=False,
+        alternative="two-sided",
+        method="asymptotic",
+    )
     nonzero = difference[difference != 0]
     if nonzero.size == 0:
         effect = 0.0
@@ -178,4 +204,9 @@ def paired_wilcoxon(x: Iterable[float], y: Iterable[float]) -> dict[str, float]:
         "p_value": float(result.pvalue),
         "rank_biserial": effect,
         "n_pairs": int(left.size),
+        "n_zero_differences": int(np.count_nonzero(difference == 0.0)),
+        "n_unique_absolute_nonzero_differences": int(np.unique(np.abs(nonzero)).size),
+        "method": "asymptotic",
+        "zero_method": "pratt",
+        "continuity_correction": False,
     }

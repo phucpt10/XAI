@@ -1,6 +1,7 @@
+import numpy as np
 import pytest
 
-from plantxai_stability.statistics import holm_adjust, paired_wilcoxon
+from plantxai_stability.statistics import _masked_topk_iou, holm_adjust, paired_wilcoxon
 
 
 def test_holm_adjustment_is_bounded_and_monotone_in_sorted_order() -> None:
@@ -23,4 +24,20 @@ def test_identical_paired_values_have_neutral_wilcoxon_result() -> None:
         "p_value": 1.0,
         "rank_biserial": 0.0,
         "n_pairs": 3,
+        "n_zero_differences": 3,
+        "n_unique_absolute_nonzero_differences": 0,
+        "method": "asymptotic",
+        "zero_method": "pratt",
+        "continuity_correction": False,
     }
+
+
+def test_topk_iou_selects_exact_cardinality_under_ties() -> None:
+    left = np.zeros((2, 5), dtype=float)
+    right = np.zeros((2, 5), dtype=float)
+    left[0, 0] = 1.0
+    right[0, 0] = 1.0
+    mask = np.ones((2, 5), dtype=bool)
+    assert _masked_topk_iou(left, right, mask, 0.1) == 1.0
+    shifted = np.roll(right, 1, axis=1)
+    assert _masked_topk_iou(left, shifted, mask, 0.1) == 0.0

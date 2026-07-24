@@ -1,0 +1,16 @@
+decision_id: DR-ALGORITHM-CORRECTION-001
+title: Approval of corrected transformation and top-k metric semantics
+status: approved
+decision_type: algorithm_correction
+approved_at_utc: 2026-07-24
+approved_by: project_owner
+baseline_tag: baseline-results-v1.0
+approved_corrections:
+  gaussian_blur: {operator: OpenCV_GaussianBlur, kernel_size: positive_odd_integer, sigma: finite_positive, border_mode: BORDER_REFLECT_101, opencv_distribution_version: "4.13.0.92"}
+  topk_iou: {selected_count: ceil_fraction_times_valid_pixels, tie_break: row_major_valid_pixel_index, fractions: [0.10, 0.20, 0.30]}
+scientific_constraints:
+  v09_results_must_not_be_overwritten: true
+  gaussian_blur_severity_pilot_required_before_test_access: true
+  all_topk_iou_results_must_be_recomputed: true
+  all_gaussian_blur_results_must_be_recomputed: true
+project_owner_approval: Protocol v1.0 correction semantics are approved; v0.9 remains immutable.
