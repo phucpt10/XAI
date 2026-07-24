@@ -43,6 +43,15 @@ def main() -> int:
     parser.add_argument("--max-leaves-per-class", type=int, default=20)
     parser.add_argument("--minimum-leaves-per-class", type=int, default=10)
     parser.add_argument("--scenario-id", default="gaussian_blur_severe")
+    parser.add_argument(
+        "--efficientnet-scorecam-target-layer",
+        choices=("features[-1]", "features[-2]"),
+        default="features[-1]",
+        help=(
+            "Validation-only candidate override. It must be backed by a new "
+            "Decision Record before an official run."
+        ),
+    )
     args = parser.parse_args()
     if args.output_dir.exists():
         raise SystemExit("Preflight output already exists; choose a new versioned directory")
@@ -95,13 +104,16 @@ def main() -> int:
         load_checkpoint(wrapper, checkpoint, args.device)
         model = wrapper.model.to(args.device)
         model.eval()
-        generator = CAMGenerator(model, wrapper.target_layer(), "score_cam")
+        target_layer, target_layer_name = _score_cam_target_layer(
+            wrapper, args.efficientnet_scorecam_target_layer
+        )
+        generator = CAMGenerator(model, target_layer, "score_cam")
         try:
             generator.__enter__()
             for index, record in enumerate(selected, start=1):
                 rows.append(_evaluate_record(
                     record, args.image_root, model, generator, pipeline, scenario,
-                    model_id, actual_hash, args.device,
+                    model_id, actual_hash, args.device, target_layer_name,
                 ))
                 if index % 5 == 0 or index == len(selected):
                     print(f"{model_id}: {index}/{len(selected)} validation leaves")
@@ -126,6 +138,10 @@ def main() -> int:
         "checkpoint_decision_record_sha256": sha256_file(args.checkpoint_decision_record),
         "source_split": "validation",
         "xai_method": "score_cam",
+        "target_layers": {
+            "resnet50": "layer4[-1]",
+            "efficientnet_b0": args.efficientnet_scorecam_target_layer,
+        },
         "scenario_id": args.scenario_id,
         "target_class_policy": "original_predicted_class",
         "selected_sample_count": len(selected),
@@ -173,9 +189,19 @@ def _require_validation_bundle(manifest: Path) -> None:
         raise SystemExit("Freeze record hash does not match recovery report")
 
 
+def _score_cam_target_layer(
+    wrapper: ModelWrapper, efficientnet_scorecam_target_layer: str
+) -> tuple[Any, str]:
+    if wrapper.model_id == "resnet50":
+        return wrapper.target_layer(), "layer4[-1]"
+    if efficientnet_scorecam_target_layer == "features[-1]":
+        return wrapper.model.features[-1], "features[-1]"
+    return wrapper.model.features[-2], "features[-2]"
+
+
 def _evaluate_record(record: Any, image_root: Path, model: Any, generator: CAMGenerator,
                      pipeline: TransformationPipeline, scenario: Any, model_id: str,
-                     checkpoint_sha256: str, device: str) -> dict[str, Any]:
+                     checkpoint_sha256: str, device: str, target_layer_name: str) -> dict[str, Any]:
     import torch
     original = load_verified_record(record, image_root)
     original_tensor = preprocess_for_model(original).unsqueeze(0).to(device)
@@ -191,6 +217,7 @@ def _evaluate_record(record: Any, image_root: Path, model: Any, generator: CAMGe
         "sample_id": record.sample_id, "leaf_id": record.leaf_id,
         "class_id": record.class_id, "class_name": record.class_name, "split": record.split,
         "model_id": model_id, "checkpoint_sha256": checkpoint_sha256,
+        "target_layer": target_layer_name,
         "scenario_id": scenario.scenario_id, "target_class_id": original_class,
         "transformed_predicted_class_id": transformed_class,
         "prediction_consistent": original_class == transformed_class,
