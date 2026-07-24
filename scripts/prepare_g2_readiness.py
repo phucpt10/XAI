@@ -29,6 +29,8 @@ def main() -> int:
     parser.add_argument("--protocol", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--checkpoint-decision-record", type=Path, required=True)
+    parser.add_argument("--recovery-decision-record", type=Path)
+    parser.add_argument("--recovery-binding-report", type=Path)
     for model_id in MODELS:
         option = model_id.replace("_", "-")
         parser.add_argument(f"--{option}-checkpoint", type=Path, required=True)
@@ -51,7 +53,8 @@ def main() -> int:
     manifest_sha256 = sha256_file(args.manifest)
     freeze_record = require_frozen_artifacts(args.manifest)
     freeze_path = args.manifest.parent / "freeze_record.json"
-    freeze_record_sha256 = sha256_file(freeze_path)
+    physical_freeze_record_sha256 = sha256_file(freeze_path)
+    historical_freeze_record_sha256 = physical_freeze_record_sha256
     split_summary_path = args.manifest.parent / "split_summary.json"
     if not split_summary_path.is_file():
         raise SystemExit("G2 readiness blocked: split_summary.json is missing")
@@ -86,6 +89,32 @@ def main() -> int:
         args.checkpoint_decision_record.read_text(encoding="utf-8")
     )
     decision_sha256 = sha256_file(args.checkpoint_decision_record)
+    expected_historical_freeze = str(
+        decision.get("training_lineage", {}).get("freeze_record_sha256", "")
+    )
+    recovery_lineage: dict[str, Any] | None = None
+    if physical_freeze_record_sha256 != expected_historical_freeze:
+        if args.recovery_decision_record is None or args.recovery_binding_report is None:
+            raise SystemExit(
+                "G2 readiness blocked: physical freeze differs from checkpoint lineage; "
+                "recovery Decision Record and binding report are required"
+            )
+        from plantxai_stability.recovery import validate_recovery_binding
+
+        recovery_lineage = validate_recovery_binding(
+            manifest_path=args.manifest,
+            recovery_decision_path=args.recovery_decision_record,
+            recovery_binding_report_path=args.recovery_binding_report,
+        )
+        historical_freeze_record_sha256 = recovery_lineage[
+            "historical_final_freeze_record_sha256"
+        ]
+        if historical_freeze_record_sha256 != expected_historical_freeze:
+            raise SystemExit("G2 readiness blocked: recovery historical freeze mismatch")
+    elif args.recovery_decision_record is not None or args.recovery_binding_report is not None:
+        raise SystemExit(
+            "G2 readiness blocked: recovery evidence supplied for unchanged physical freeze"
+        )
     model_results: dict[str, Any] = {}
     for model_id in MODELS:
         option = model_id.replace("_", "-")
@@ -100,7 +129,7 @@ def main() -> int:
             declared_models=resolved.values["models"],
             checkpoint_sha256=checkpoint_sha256,
             manifest_sha256=manifest_sha256,
-            freeze_record_sha256=freeze_record_sha256,
+            freeze_record_sha256=historical_freeze_record_sha256,
         )
         approved = lineage["checkpoint"]
         evidence_sha256 = sha256_file(evidence_path)
@@ -168,7 +197,9 @@ def main() -> int:
         "checkpoint_decision_record_id": decision["decision_id"],
         "checkpoint_decision_record_sha256": decision_sha256,
         "manifest_sha256": manifest_sha256,
-        "freeze_record_sha256": freeze_record_sha256,
+        "freeze_record_sha256": historical_freeze_record_sha256,
+        "physical_freeze_record_sha256": physical_freeze_record_sha256,
+        "recovery_lineage": recovery_lineage,
         "freeze_record_protocol_hash": freeze_record.get("protocol_hash"),
         "split_summary_sha256": sha256_file(split_summary_path),
         "official_test": {
