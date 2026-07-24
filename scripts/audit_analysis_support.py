@@ -173,8 +173,17 @@ def _write_csv_atomic(
 
 
 def _git_revision() -> str:
+    repository = Path(__file__).resolve().parents[1]
     completed = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+        [
+            "git",
+            "-c",
+            f"safe.directory={repository.as_posix()}",
+            "-C",
+            str(repository),
+            "rev-parse",
+            "HEAD",
+        ],
         check=True,
         capture_output=True,
         text=True,
