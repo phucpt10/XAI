@@ -66,6 +66,7 @@ def main() -> int:
     parser.add_argument("--g2-readiness-report", type=Path, required=True)
     parser.add_argument("--recovery-decision-record", type=Path)
     parser.add_argument("--recovery-binding-report", type=Path)
+    parser.add_argument("--recovery-supersession-record", type=Path)
     parser.add_argument(
         "--model-id", choices=["resnet50", "efficientnet_b0"], required=True
     )
@@ -115,6 +116,7 @@ def main() -> int:
             model_id=args.model_id,
             xai_method=args.xai_method,
             recovery_decision_path=args.recovery_decision_record,
+            recovery_supersession_path=args.recovery_supersession_record,
         )
     records = sorted(authorization["test_records"], key=lambda item: item.sample_id)
     scenarios = scenario_grid(resolved.values["transformations"]["parameters"])

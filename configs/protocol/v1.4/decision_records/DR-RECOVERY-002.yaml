@@ -1,0 +1,37 @@
+decision_id: DR-RECOVERY-002
+title: Supersession for the corrected protocol v1.4 ResNet50 Grad-CAM rerun
+status: approved
+decision_type: corrected_protocol_rerun_supersession
+approved_at_utc: 2026-07-25
+approved_by: project_owner
+
+supersedes_decision_id: DR-RECOVERY-001
+superseded_recovery_decision_record_sha256: df27d85242f38acbe46c9756495a00eec87f3a32264e82aa3c0865b19f828c79
+authorized_corrected_rerun:
+  model_id: resnet50
+  xai_method: grad_cam
+
+scope:
+  protocol_version: v1.4
+  reason: >-
+    The original completed part predates the corrected transformation and
+    evaluation implementation. A full, internally consistent v1.4 campaign
+    requires this one model-method cell to be rerun.
+
+constraints:
+  same_checkpoint: true
+  same_manifest_and_split: true
+  same_seed: true
+  same_registered_protocol_v1_4: true
+  no_test_based_tuning: true
+  no_overwrite: true
+
+decision: >-
+  Supersede only the DR-RECOVERY-001 restriction that prohibited rerunning
+  ResNet50 Grad-CAM. This permits exactly one fresh v1.4 corrected rerun under
+  DR-TEST-003. All other recovery lineage, integrity, and anti-tuning controls
+  remain in force.
+project_owner_approval: >-
+  Approved by the project owner to run all six model-method parts once under
+  the corrected protocol v1.4 without changing data, split, checkpoint,
+  hyperparameters, transformations, target layers, or methods after test access.

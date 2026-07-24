@@ -229,15 +229,66 @@ def authorize_recovery_joint_part(
     model_id: str,
     xai_method: str,
     recovery_decision_path: str | Path,
+    recovery_supersession_path: str | Path | None = None,
 ) -> None:
-    """Permit only one of the five unfinished model-method cells."""
+    """Permit a recovery cell, or the narrowly authorized corrected rerun."""
     decision = load_recovery_decision(recovery_decision_path)
     requested = {"model_id": model_id, "xai_method": xai_method}
-    if requested not in decision["authorized_remaining_joint_parts"]:
-        raise ValueError(
-            "DR-RECOVERY-001 does not authorize this model-method part; "
-            "completed results must not be rerun"
+    if requested in decision["authorized_remaining_joint_parts"]:
+        return
+    if requested == {"model_id": "resnet50", "xai_method": "grad_cam"}:
+        if recovery_supersession_path is None:
+            raise ValueError(
+                "DR-RECOVERY-001 does not authorize this model-method part; "
+                "a corrected-rerun supersession record is required"
+            )
+        supersession = _load_corrected_rerun_supersession(
+            recovery_supersession_path, recovery_decision_path
         )
+        if supersession["authorized_corrected_rerun"] == requested:
+            return
+    raise ValueError(
+        "Recovery authorization does not permit this model-method part"
+    )
+
+
+def _load_corrected_rerun_supersession(
+    path: str | Path, recovery_decision_path: str | Path
+) -> dict[str, Any]:
+    """Validate the sole, project-owner-approved exception to DR-RECOVERY-001."""
+    record_path = Path(path)
+    values = yaml.safe_load(record_path.read_text(encoding="utf-8"))
+    if not isinstance(values, dict):
+        raise ValueError("Recovery supersession record must be a mapping")
+    expected = {
+        "decision_id": "DR-RECOVERY-002",
+        "status": "approved",
+        "decision_type": "corrected_protocol_rerun_supersession",
+        "supersedes_decision_id": "DR-RECOVERY-001",
+        "superseded_recovery_decision_record_sha256": sha256_file(
+            recovery_decision_path
+        ),
+        "authorized_corrected_rerun": {
+            "model_id": "resnet50", "xai_method": "grad_cam"
+        },
+    }
+    mismatches = [key for key, value in expected.items() if values.get(key) != value]
+    if mismatches:
+        raise ValueError(
+            "Recovery supersession mismatch: " + ", ".join(sorted(mismatches))
+        )
+    policy = values.get("constraints", {})
+    for key in (
+        "same_checkpoint",
+        "same_manifest_and_split",
+        "same_seed",
+        "same_registered_protocol_v1_4",
+        "no_test_based_tuning",
+        "no_overwrite",
+    ):
+        if policy.get(key) is not True:
+            raise ValueError(f"Recovery supersession constraint missing: {key}")
+    return values
 
 
 def validate_recovered_completed_joint_part(

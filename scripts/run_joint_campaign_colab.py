@@ -29,6 +29,7 @@ def main() -> int:
     parser.add_argument("--g2-readiness-report", type=Path, required=True)
     parser.add_argument("--recovery-decision-record", type=Path)
     parser.add_argument("--recovery-binding-report", type=Path)
+    parser.add_argument("--recovery-supersession-record", type=Path)
     parser.add_argument("--resnet50-checkpoint", type=Path, required=True)
     parser.add_argument("--efficientnet-b0-checkpoint", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
@@ -132,6 +133,13 @@ def main() -> int:
                         str(args.recovery_binding_report),
                     ]
                 )
+                if args.recovery_supersession_record is not None:
+                    command.extend(
+                        [
+                            "--recovery-supersession-record",
+                            str(args.recovery_supersession_record),
+                        ]
+                    )
             if resume:
                 command.append("--resume")
             print(

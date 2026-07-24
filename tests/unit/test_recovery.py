@@ -28,6 +28,18 @@ def test_recovery_decision_authorizes_only_five_unfinished_parts() -> None:
         )
 
 
+def test_corrected_rerun_requires_the_approved_supersession() -> None:
+    supersession = Path(
+        "configs/protocol/v1.4/decision_records/DR-RECOVERY-002.yaml"
+    )
+    recovery.authorize_recovery_joint_part(
+        model_id="resnet50",
+        xai_method="grad_cam",
+        recovery_decision_path=DECISION,
+        recovery_supersession_path=supersession,
+    )
+
+
 def test_recovery_binding_preserves_logical_and_physical_freeze_identities(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
