@@ -1,0 +1,45 @@
+decision_id: DR-CHECKPOINT-004
+title: Complete fixed-checkpoint and validation-audit lineage for v1.3
+status: approved
+decision_type: checkpoint_selection
+approved_at_utc: 2026-07-25
+approved_by: project_owner
+supersedes: {decision_id: DR-CHECKPOINT-003, scope: completion of immutable validation-audit registry only}
+selection_policy:
+  declared_models: [resnet50, efficientnet_b0]
+  selection_metric: validation_macro_f1
+  selected_checkpoint_role: validation_selected_best
+  retain_all_predeclared_backbones: true
+  model_ranking_is_descriptive_only: true
+  official_test_used_for_selection: false
+training_lineage:
+  protocol_hash: 7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b
+  manifest_sha256: 323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894
+  freeze_record_sha256: aed2e96afd2749250d4151780bb4002d198eb96d7433d2bef5b03d4a6ac9212d
+  checkpoint_source_git_commit: 3facdc158bc660b8138dc7d80447c99c85617841
+  seed: 42
+  validation_sample_count: 1363
+  validation_sample_ids_sha256: 7b1fa9caadbd6b62295439a62cfe3c3ae59e6682db54248b4849b427129d4907
+validation_audit: {source_split: validation, test_split_accessed: false, checkpoint_lineage_matches: true, validation_only: true}
+decision: {training_rerun_required: false, checkpoint_reselection_permitted: false, fixed_models: [resnet50, efficientnet_b0], checkpoint_sha256_must_match_baseline_authorization: true}
+approved_checkpoints:
+  resnet50:
+    filename: resnet50_best.pt
+    checkpoint_sha256: b508abd2851c5f576131db0e47447624cd78f1e3204c2931f7928c266f0c7bfc
+    checkpoint_evidence_sha256: 5f50b4e65f652b779f7b76cd395d4f00bb0ed1b39fb690d196e44964861accce
+    best_epoch: 29
+    validation_macro_f1: 0.9929163657569321
+    validation_accuracy: 0.9941305942773294
+    validation_error_count: 8
+    validation_artifact_sha256: {validation_confusion_matrix.csv: 07e96e13c3fe1e3c79866fc1f1d80f00bc3d3ea78fe8451cbccebc923a37c1f8, validation_per_class_metrics.csv: ae8d0af6362cb081c78d39d3799e25244616c9b839037a45962a43b13c1da891, validation_predictions.csv: c01c775a2d011aabc756446824b42e19a958ffb3c61f397c5f93dd0983099e04, validation_predictions.parquet: bb206f778f096c897eae090d92d25ea637d508678542c75b3f6c65d417b81c38}
+  efficientnet_b0:
+    filename: efficientnet_b0_best.pt
+    checkpoint_sha256: 05b592f1ff7f4f2b4a757ae2564a088e3742555e20110ee33d19e563ff2fe60b
+    checkpoint_evidence_sha256: 70cd2aa0207b03492afc06d36213e3cb25c9975a6daa7beb103d51e631abe6a3
+    best_epoch: 19
+    validation_macro_f1: 0.9971833207303504
+    validation_accuracy: 0.9977989728539985
+    validation_error_count: 3
+    validation_artifact_sha256: {validation_confusion_matrix.csv: 00343ac105eddeb8ec5a89f9ac50840fd22f3fee15e862a545257df19446bc15, validation_per_class_metrics.csv: e020f3c31ec4c96e5e0fab713c937b1425c18bbc5c7364825ae65249d5fd23f0, validation_predictions.csv: 24a02b41e2ec672b03a581b9737d67892d6a7ceb38567aa5aba2fcbe6f780b91, validation_predictions.parquet: 4ea84f0396372c84467f9ec617e211753ae6963d477cedd452083989f9ff457e}
+governance_effect: {protocol_successor: v1.3, G1_CHECKPOINT_SELECTION: pass, G2_TEST_EVALUATION_READY: pending, official_test_evaluation_allowed: false, official_test_access: prohibited_until_G2_authorization}
+project_owner_approval: Fixed baseline checkpoint and validation-audit lineage are approved for v1.3 evaluation only; no test pixels were accessed.
