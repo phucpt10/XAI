@@ -56,7 +56,7 @@ rationale: >-
   remain visible in lineage evidence; only five train samples become ineligible.
 selection_used_official_test_performance: false
 approved_by: project_owner
-approval_basis: explicit approval in the PlantXAI-Stability Codex task
+approval_basis: governed quarantine policy approved by the project owner
 approved_at_utc: 2026-07-22
 notes: >-
   Approval covers only the exact pinned revision, five selected classes,

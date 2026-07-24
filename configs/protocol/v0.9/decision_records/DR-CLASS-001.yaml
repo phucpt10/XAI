@@ -16,7 +16,7 @@ audit_identity: 915d63d4c8b66b7d8f0b3121eac5bfa3b68c0ebc4ce237c003d5f3818c97062e
 approved_by: project_owner
 approval_basis: >-
   Explicit approval to retain the five-class Tomato scope while adopting the
-  governed quarantine policy in the PlantXAI-Stability Codex task.
+  governed quarantine policy approved by the project owner.
 approved_at_utc: 2026-07-22
 notes: >-
   Approval is restricted to the pinned revision and does not use official test

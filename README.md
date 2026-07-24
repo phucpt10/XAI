@@ -2,7 +2,29 @@
 
 PlantXAI-Stability is research software for evaluating prediction robustness and XAI explanation stability under controlled image transformations.
 
-The implementation follows the English specification in `PlantXAI-Stability_Research_Software_Specification_En.docx`. G2 authorizes one registered official-test campaign after validation-only checkpoint selection and metadata-only readiness review. Every runner remains fail-closed until the runtime authorization chain passes.
+The current implemented architecture, module boundaries, governed workflows,
+experimental pipeline, artifact contracts and operational design are documented
+in [`PlantXAI-Stability_Architecture_v1.0.docx`](PlantXAI-Stability_Architecture_v1.0.docx).
+G2 authorizes one registered official-test campaign after validation-only
+checkpoint selection and metadata-only readiness review. Every runner remains
+fail-closed until the runtime authorization chain passes.
+
+## System architecture
+
+`PlantXAI-Stability_Architecture_v1.0.docx` is the single current English
+architecture specification for this repository. It covers:
+
+- configuration, governance and fail-closed authorization;
+- data identity, audit, quarantine, frozen manifests and deterministic loading;
+- ResNet50/EfficientNet-B0 training and validation-only checkpoint selection;
+- deterministic transformations, paired prediction and same-target CAM execution;
+- transactional joint evaluation, merge, recovery and artifact lineage;
+- leaf-aware statistical analysis and read-only frozen-results reporting;
+- runtime topology, quality attributes, failure handling and verification.
+
+The frozen protocol and approved Decision Records remain the normative
+machine-enforced authorities if explanatory documentation and runtime
+configuration differ.
 
 ## Current implementation
 
@@ -91,6 +113,11 @@ python -m pytest
 python -m plantxai_stability.cli validate-protocol configs/protocol/v0.9/protocol.yaml
 python -m plantxai_stability.cli smoke configs/protocol/v0.9/protocol.yaml
 ```
+
+Vietnamese team instructions for cloning to a personal GitHub fork, training
+from the prepared frozen dataset, validation-only checkpoint auditing and
+independent verification of frozen official results are available in
+[`docs/HUONG_DAN_TAI_LAP_THUC_NGHIEM.md`](docs/HUONG_DAN_TAI_LAP_THUC_NGHIEM.md).
 
 Official training additionally requires a frozen dataset record whose protocol
 hash exactly matches its training protocol. G2 is approved; baseline and joint

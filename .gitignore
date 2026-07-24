@@ -20,5 +20,13 @@ checkpoints/
 .ipynb_checkpoints/
 .colab_cache/
 
+# Local document-generation and assistant workspaces.
+.docx_qa/
+.spec_work/
+plantxai_spec_qa/
+.agents/
+.codex/
+.augment/
+
 # Local Git metadata workaround for managed workspaces where .git is read-only.
 .gitmeta/
