@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from plantxai_stability.artifacts import atomic_json
-from plantxai_stability.config import load_protocol
+from plantxai_stability.config import load_protocol, resolve_xai_target_layer
 from plantxai_stability.provenance import sha256_file
 from plantxai_stability.recovery import (
     authorize_recovery_joint_part,
@@ -92,7 +92,6 @@ def main() -> int:
         "test_decision_record_sha256",
         "g2_readiness_report_sha256",
         "transformation_algorithm_version",
-        "xai_policy",
         "software_version",
         "runtime_identity",
     )
@@ -105,6 +104,20 @@ def main() -> int:
         ]
         if mismatches:
             raise SystemExit(f"Joint part lineage mismatch: {mismatches}")
+        if _common_xai_policy(identity) != _common_xai_policy(reference_identity):
+            raise SystemExit("Joint part lineage mismatch: ['xai_policy']")
+    for part in parts:
+        identity = part["report"]["run_identity"]
+        policy = identity.get("xai_policy", {})
+        expected_layer = resolve_xai_target_layer(
+            resolved.values["xai"],
+            identity["model_id"],
+            identity["xai_method"],
+        )
+        if policy.get("target_layer") != expected_layer:
+            raise SystemExit(
+                "Joint part target layer does not match the frozen method policy"
+            )
     if recovery_lineage is None:
         commits = {part["report"]["run_identity"].get("git_commit") for part in parts}
         if len(commits) != 1:
@@ -391,6 +404,14 @@ def _validate_recovery_transition(
 
 def _prediction_payload(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     return [{key: value for key, value in row.items() if key != "run_id"} for row in rows]
+
+
+def _common_xai_policy(identity: dict[str, Any]) -> dict[str, Any]:
+    """Exclude the deliberately method-specific target layer from shared lineage."""
+    policy = identity.get("xai_policy")
+    if not isinstance(policy, dict):
+        raise SystemExit("Joint part is missing its XAI policy")
+    return {key: value for key, value in policy.items() if key != "target_layer"}
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
