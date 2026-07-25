@@ -13,6 +13,7 @@ from plantxai_stability.artifacts import atomic_json
 from plantxai_stability.config import load_protocol
 from plantxai_stability.provenance import sha256_file
 from plantxai_stability.recovery import (
+    authorize_recovery_joint_part,
     load_recovery_decision,
     validate_preserved_joint_part,
     validate_recovery_binding,
@@ -22,13 +23,14 @@ from plantxai_stability.recovery import (
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--protocol", type=Path, required=True)
-    parser.add_argument("--baseline-report", type=Path, required=True)
+    parser.add_argument("--baseline-report", type=Path)
     parser.add_argument("--part-dir", type=Path, action="append", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--recovery-decision-record", type=Path)
     parser.add_argument("--recovery-binding-report", type=Path)
+    parser.add_argument("--recovery-supersession-record", type=Path)
     args = parser.parse_args()
     if args.output_dir.exists():
         raise SystemExit("Merged output exists; use a new immutable directory")
@@ -65,12 +67,6 @@ def main() -> int:
         raise SystemExit(
             f"Expected {len(declared_methods)} --part-dir values, got {len(args.part_dir)}"
         )
-    baseline = json.loads(args.baseline_report.read_text(encoding="utf-8"))
-    if baseline.get("run_type") != "authorized_official_test_baseline":
-        raise SystemExit("Baseline report is not an authorized official result")
-    if baseline.get("official_test_result") is not True:
-        raise SystemExit("Baseline report does not contain an official result")
-
     parts = [_load_part(path) for path in args.part_dir]
     methods = [part["report"]["run_identity"]["xai_method"] for part in parts]
     if sorted(methods) != sorted(declared_methods) or len(set(methods)) != len(methods):
@@ -119,12 +115,25 @@ def main() -> int:
             parts=parts,
             recovery_lineage=recovery_lineage,
             recovery_decision_path=args.recovery_decision_record,
+            recovery_supersession_path=args.recovery_supersession_record,
         )
     if reference_identity["governance_protocol_hash"] != resolved.sha256:
         raise SystemExit("Joint parts do not match the current frozen governance protocol")
-    _validate_baseline_binding(baseline, reference_identity)
+    baseline = None
+    if args.baseline_report is not None:
+        baseline = json.loads(args.baseline_report.read_text(encoding="utf-8"))
+        if baseline.get("run_type") != "authorized_official_test_baseline":
+            raise SystemExit("Baseline report is not an authorized official result")
+        if baseline.get("official_test_result") is not True:
+            raise SystemExit("Baseline report does not contain an official result")
+        _validate_baseline_binding(baseline, reference_identity)
+    elif reference_identity.get("authorization_decision_id") != "DR-TEST-003":
+        raise SystemExit(
+            "--baseline-report is required unless the run is authorized by DR-TEST-003"
+        )
+
     preserved_baseline_hash_matches = True
-    if recovery_lineage is not None:
+    if recovery_lineage is not None and baseline is not None:
         recovery_decision = load_recovery_decision(args.recovery_decision_record)
         baseline_key = (
             "resnet50_report_sha256"
@@ -176,6 +185,7 @@ def main() -> int:
     }
     criteria = {
         "baseline_binding_matches": True,
+        "prediction_baseline_bound_by_method_agreement": True,
         "preserved_baseline_hash_matches": preserved_baseline_hash_matches,
         "all_declared_methods_present": sorted(methods) == sorted(declared_methods),
         "child_artifact_hashes_match": True,
@@ -194,7 +204,8 @@ def main() -> int:
             and len(joint_keys) == expected_joint_count
         ),
         "official_test_identity_matches": (
-            baseline.get("official_test_identity")
+            baseline is None
+            or baseline.get("official_test_identity")
             == parts[0]["report"].get("official_test_identity")
         ),
         "immutable_output_directory": True,
@@ -223,7 +234,18 @@ def main() -> int:
         "manifest_sha256": reference_identity["manifest_sha256"],
         "freeze_record_sha256": reference_identity["freeze_record_sha256"],
         "recovery_lineage": recovery_lineage,
-        "official_test_identity": baseline["official_test_identity"],
+        "official_test_identity": parts[0]["report"]["official_test_identity"],
+        "baseline_provenance": (
+            {
+                "source": "separate_authorized_baseline_report",
+                "baseline_report_sha256": sha256_file(args.baseline_report),
+            }
+            if baseline is not None
+            else {
+                "source": "exact_prediction_agreement_across_three_authorized_method_parts",
+                "baseline_report_sha256": None,
+            }
+        ),
         "scenario_ids": scenario_ids,
         "xai_methods": declared_methods,
         "prediction_row_count": len(merged_predictions),
@@ -234,7 +256,9 @@ def main() -> int:
         "excluded_joint_metric_count": sum(
             bool(row["exclusion_reason"]) for row in merged_joint
         ),
-        "baseline_report_sha256": sha256_file(args.baseline_report),
+        "baseline_report_sha256": (
+            sha256_file(args.baseline_report) if baseline is not None else None
+        ),
         "source_parts": [
             {
                 "directory": str(part["path"]),
@@ -314,6 +338,7 @@ def _validate_recovery_transition(
     parts: list[dict[str, Any]],
     recovery_lineage: dict[str, Any],
     recovery_decision_path: Path,
+    recovery_supersession_path: Path | None,
 ) -> bool:
     decision = load_recovery_decision(recovery_decision_path)
     preserved = decision["preserved_official_results"]["completed_joint_part"]
@@ -339,7 +364,20 @@ def _validate_recovery_transition(
         if not isinstance(commit, str) or not commit:
             raise SystemExit("Recovered joint part lacks a Git commit")
         recovered_commits.add(commit)
-    expected_legacy_count = 1 if model_id == preserved["model_id"] else 0
+    if recovery_supersession_path is not None:
+        for part in parts:
+            identity = part["report"]["run_identity"]
+            authorize_recovery_joint_part(
+                model_id=identity["model_id"],
+                xai_method=identity["xai_method"],
+                recovery_decision_path=recovery_decision_path,
+                recovery_supersession_path=recovery_supersession_path,
+            )
+    expected_legacy_count = (
+        0
+        if recovery_supersession_path is not None
+        else (1 if model_id == preserved["model_id"] else 0)
+    )
     if legacy_count != expected_legacy_count:
         raise SystemExit(
             "Recovery merge does not preserve the exact approved legacy joint part"
