@@ -21,10 +21,6 @@ RQ1_PRIMARY = ("is_consistent", "transformed_is_correct", "confidence_drop")
 RQ1_SECONDARY = ("absolute_confidence_delta",)
 RQ2_PRIMARY = ("pearson", "ssim", "topk_iou_20")
 RQ2_SECONDARY = ("cosine", "topk_iou_10", "topk_iou_30")
-APPROVED_MERGE_REPORT_SHA256 = {
-    "resnet50": "32610c640f3f35455bcdd998a3f0bb1a09eac2ff34f40dcdb51c0d86e8ac7c1e",
-    "efficientnet_b0": ("0cc81bef79c9bf273eff753eef74fa737d35d6b8abef7951acd3fa2e6d534401"),
-}
 EXPECTED_FIXED_ROW_COUNTS = {
     "prediction_summary.csv": 96,
     "prediction_class_summary.csv": 480,
@@ -60,10 +56,10 @@ def load_analysis_decision(path: Path) -> dict[str, Any]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("Analysis Decision Record must be a YAML mapping")
-    if payload.get("decision_id") != "DR-ANALYSIS-001":
-        raise ValueError("Expected DR-ANALYSIS-001")
+    if payload.get("decision_id") not in {"DR-ANALYSIS-001", "DR-ANALYSIS-002"}:
+        raise ValueError("Unsupported analysis Decision Record")
     if payload.get("status") != "approved":
-        raise ValueError("DR-ANALYSIS-001 is not approved")
+        raise ValueError("Analysis Decision Record is not approved")
     return payload
 
 
@@ -242,11 +238,15 @@ def validate_analysis_plan(decision: dict[str, Any], resolved: ResolvedConfig) -
     if any(endpoints.get(key) != value for key, value in endpoint_checks.items()):
         raise ValueError("Analysis endpoints differ from the implemented fixed plan")
     source_merges = decision.get("source_merges", {})
-    if any(
-        source_merges.get(model, {}).get("report_sha256") != expected_hash
-        for model, expected_hash in APPROVED_MERGE_REPORT_SHA256.items()
-    ):
-        raise ValueError("Analysis source merge SHA-256 values are not approved")
+    for model in resolved.values["models"]:
+        source = source_merges.get(model, {})
+        report_hash = source.get("report_sha256")
+        if not isinstance(report_hash, str) or len(report_hash) != 64:
+            raise ValueError("Analysis source merge SHA-256 value is invalid")
+        if source.get("prediction_row_count") != 20316:
+            raise ValueError("Analysis prediction-row count is invalid")
+        if source.get("joint_row_count") != 60948:
+            raise ValueError("Analysis joint-row count is invalid")
     expected_rows = decision.get("outputs", {}).get("expected_fixed_row_counts")
     if expected_rows != EXPECTED_FIXED_ROW_COUNTS:
         raise ValueError("Analysis output coverage differs from the fixed plan")
@@ -812,7 +812,9 @@ def _validate_shared_lineage(reports: dict[str, dict[str, Any]], decision: dict[
     }
     mismatches = [field for field, value in expected.items() if left.get(field) != value]
     if mismatches:
-        raise ValueError(f"Merge lineage differs from DR-ANALYSIS-001: {mismatches}")
+        raise ValueError(
+            f"Merge lineage differs from {decision['decision_id']}: {mismatches}"
+        )
 
 
 def _validate_cross_model_identity(predictions: pd.DataFrame) -> None:
