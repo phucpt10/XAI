@@ -156,7 +156,21 @@ def _load_decision(path: Path) -> dict[str, Any]:
         raise ValueError("DR-RESULTS-003 lacks project-owner approval")
     if decision.get("authorized_outputs", {}).get("artifacts") != list(ARTIFACTS):
         raise ValueError("DR-RESULTS-003 output contract mismatch")
-    if not all(decision.get("constraints", {}).values()):
+    expected_constraints = {
+        "source_artifacts_read_only": True,
+        "official_test_pixels_accessed": False,
+        "predictions_or_cams_recomputed": False,
+        "no_new_hypothesis_tests": True,
+        "no_new_confidence_intervals": True,
+        "no_endpoint_or_holm_family_changes": True,
+        "no_model_or_method_selection": True,
+        "no_tuning": True,
+        "classwise_results_descriptive_only": True,
+        "leave_one_class_out_is_sensitivity_diagnostic_only": True,
+        "xai_metrics_conditional_on_valid_prediction_consistent_cam": True,
+        "external_generalization_claims_prohibited": True,
+    }
+    if decision.get("constraints") != expected_constraints:
         raise ValueError("DR-RESULTS-003 constraints are incomplete")
     return decision
 
