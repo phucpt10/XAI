@@ -75,8 +75,8 @@ def load_results_decision(path: Path) -> dict[str, Any]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("Results Decision Record must be a YAML mapping")
-    if payload.get("decision_id") != "DR-RESULTS-001":
-        raise ValueError("Expected DR-RESULTS-001")
+    if payload.get("decision_id") not in {"DR-RESULTS-001", "DR-RESULTS-002"}:
+        raise ValueError("Unsupported results Decision Record")
     if payload.get("status") != "approved" or payload.get("approved_by") != "project_owner":
         raise ValueError("DR-RESULTS-001 lacks project-owner approval")
     return payload
@@ -91,13 +91,18 @@ def load_and_validate_frozen_results(
     report_path = analysis_dir / "official_analysis_report.json"
     if not report_path.is_file():
         raise ValueError(f"Missing frozen analysis report: {report_path}")
-    if source.get("report_sha256") != FROZEN_ANALYSIS_REPORT_SHA256:
-        raise ValueError("DR-RESULTS-001 contains an unapproved report SHA-256")
-    if sha256_file(report_path) != FROZEN_ANALYSIS_REPORT_SHA256:
+    source_report_sha256 = source.get("report_sha256")
+    source_artifacts = source.get("artifact_sha256")
+    frozen_rows = decision.get("frozen_row_counts")
+    if not isinstance(source_report_sha256, str) or len(source_report_sha256) != 64:
+        raise ValueError("Results Decision Record contains an invalid report SHA-256")
+    if not isinstance(source_artifacts, dict) or not source_artifacts:
+        raise ValueError("Results Decision Record lacks a child artifact registry")
+    if not isinstance(frozen_rows, dict):
+        raise ValueError("Results Decision Record lacks frozen row counts")
+    if sha256_file(report_path) != source_report_sha256:
         raise ValueError("Frozen analysis report SHA-256 mismatch")
-    if source.get("artifact_sha256") != FROZEN_ANALYSIS_ARTIFACT_SHA256:
-        raise ValueError("DR-RESULTS-001 child artifact registry mismatch")
-    for name, expected_hash in FROZEN_ANALYSIS_ARTIFACT_SHA256.items():
+    for name, expected_hash in source_artifacts.items():
         path = analysis_dir / name
         if not path.is_file() or sha256_file(path) != expected_hash:
             raise ValueError(f"Frozen analysis artifact SHA-256 mismatch: {path}")
@@ -120,25 +125,23 @@ def load_and_validate_frozen_results(
         raise ValueError(f"Frozen analysis report lineage mismatch: {mismatches}")
     if report.get("runtime", {}).get("git_commit") != source.get("git_commit"):
         raise ValueError("Frozen analysis code revision mismatch")
-    if report.get("row_counts") != FROZEN_ROW_COUNTS:
+    if report.get("row_counts") != frozen_rows:
         raise ValueError("Frozen analysis report row counts mismatch")
-    if decision.get("frozen_row_counts") != FROZEN_ROW_COUNTS:
-        raise ValueError("DR-RESULTS-001 row-count contract mismatch")
     output_contract = {
         "tables": list(REPORTING_TABLES),
         "figures": list(REPORTING_FIGURES),
         "summaries": list(REPORTING_SUMMARIES),
     }
     if decision.get("authorized_reporting_outputs") != output_contract:
-        raise ValueError("DR-RESULTS-001 reporting output contract mismatch")
-    if report.get("artifact_sha256") != FROZEN_ANALYSIS_ARTIFACT_SHA256:
+        raise ValueError("Results Decision Record reporting output contract mismatch")
+    if report.get("artifact_sha256") != source_artifacts:
         raise ValueError("Frozen analysis report child artifact registry mismatch")
     if not report.get("acceptance_criteria") or not all(report["acceptance_criteria"].values()):
         raise ValueError("Frozen analysis report contains a failed criterion")
 
     frames = {
         name: pd.read_csv(analysis_dir / name, keep_default_na=False)
-        for name in FROZEN_ANALYSIS_ARTIFACT_SHA256
+        for name in source_artifacts
     }
     observed_rows = {
         "prediction_summary_rows": len(frames["prediction_summary.csv"]),
@@ -149,11 +152,11 @@ def load_and_validate_frozen_results(
         "rq3_association_rows": len(frames["rq3_association_summary.csv"]),
     }
     for key, count in observed_rows.items():
-        if count != FROZEN_ROW_COUNTS[key]:
+        if count != frozen_rows[key]:
             raise ValueError(f"Frozen artifact row-count mismatch: {key}")
     _validate_paired_comparisons(
         frames["paired_comparisons.csv"],
-        decision.get("non_estimable_contract", {}),
+        decision=decision,
     )
     _validate_reporting_scope(frames)
     constraints = decision.get("reporting_constraints", {})
@@ -248,6 +251,7 @@ def build_frozen_results_summary(
     *,
     report: Mapping[str, Any],
     tables: Mapping[str, pd.DataFrame],
+    source_analysis_report_sha256: str = FROZEN_ANALYSIS_REPORT_SHA256,
 ) -> dict[str, Any]:
     rq1 = tables["table_rq1_primary_summary.csv"]
     rq2 = tables["table_rq2_primary_summary.csv"]
@@ -257,7 +261,7 @@ def build_frozen_results_summary(
 
     return {
         "summary_role": "read_only_reporting_from_frozen_official_analysis",
-        "source_analysis_report_sha256": FROZEN_ANALYSIS_REPORT_SHA256,
+        "source_analysis_report_sha256": source_analysis_report_sha256,
         "row_counts": dict(report["row_counts"]),
         "rq1_estimate_ranges_by_model_and_endpoint": _estimate_ranges(
             rq1,
@@ -379,13 +383,17 @@ def render_summary_markdown(summary: Mapping[str, Any]) -> str:
             "{estimable_count} | {non_estimable_count} | "
             "{holm_rejection_count} |".format(**row)
         )
+    estimability_note = (
+        "- All predeclared paired contrasts were estimable."
+        if rows["paired_non_estimable_rows"] == 0
+        else "- Non-estimable rows are non-estimable, not non-significant."
+    )
     lines.extend(
         [
             "",
             "## Required interpretation constraints",
             "",
-            "- The three Score-CAM × Gaussian-blur-severe cross-model endpoint rows "
-            "are non-estimable, not non-significant.",
+            estimability_note,
             "- Descriptive ranges and Holm rejection counts are reporting summaries, "
             "not model or XAI selection rules.",
             "- RQ3 remains exploratory and has no hypothesis tests.",
@@ -399,36 +407,62 @@ def render_summary_markdown(summary: Mapping[str, Any]) -> str:
 
 def _validate_paired_comparisons(
     frame: pd.DataFrame,
-    contract: Mapping[str, Any],
+    contract: Mapping[str, Any] | None = None,
+    *,
+    decision: Mapping[str, Any] | None = None,
 ) -> None:
+    if decision is None:
+        decision = {
+            "decision_id": "DR-RESULTS-001",
+            "frozen_row_counts": FROZEN_ROW_COUNTS,
+            "non_estimable_contract": dict(contract or {}),
+        }
     estimable = _boolean_series(frame["estimable"], "estimable")
     non_estimable = frame.loc[~estimable]
-    if int(estimable.sum()) != 573 or len(non_estimable) != 3:
-        raise ValueError("Frozen paired-comparison estimability counts mismatch")
-    expected_contract = {
-        "contrast": NON_ESTIMABLE_CONTRAST,
-        "endpoints": list(RQ2_PRIMARY),
-        "support_status": NON_ESTIMABLE_STATUS,
-        "common_sample_count": 14,
-        "common_leaf_count": 12,
-        "minimum_common_leaf_count": 20,
-        "inferential_fields_empty": True,
-        "interpretation_as_non_significant_prohibited": True,
-    }
-    if dict(contract) != expected_contract:
-        raise ValueError("DR-RESULTS-001 non-estimable contract mismatch")
+    rows = decision["frozen_row_counts"]
     if (
-        set(non_estimable["contrast"]) != {NON_ESTIMABLE_CONTRAST}
-        or set(non_estimable["endpoint"]) != set(RQ2_PRIMARY)
-        or set(non_estimable["support_status"]) != {NON_ESTIMABLE_STATUS}
-        or set(non_estimable["n_common_sample_keys"].astype(int)) != {14}
-        or set(non_estimable["n_leaf_pairs"].astype(int)) != {12}
-        or set(non_estimable["holm_family_size"].astype(int)) != {12}
-        or set(non_estimable["holm_estimable_count"].astype(int)) != {11}
-        or set(non_estimable["holm_reserved_non_estimable_slots"].astype(int)) != {1}
-        or set(non_estimable["holm_reserved_slot_value_for_adjustment_only"].astype(float)) != {1.0}
+        len(frame) != rows["paired_comparison_rows"]
+        or int(estimable.sum()) != rows["paired_estimable_rows"]
+        or len(non_estimable) != rows["paired_non_estimable_rows"]
     ):
-        raise ValueError("Frozen non-estimable rows differ from their contract")
+        raise ValueError("Frozen paired-comparison estimability counts mismatch")
+    if decision["decision_id"] == "DR-RESULTS-001":
+        contract = decision.get("non_estimable_contract", {})
+        expected_contract = {
+            "contrast": NON_ESTIMABLE_CONTRAST,
+            "endpoints": list(RQ2_PRIMARY),
+            "support_status": NON_ESTIMABLE_STATUS,
+            "common_sample_count": 14,
+            "common_leaf_count": 12,
+            "minimum_common_leaf_count": 20,
+            "inferential_fields_empty": True,
+            "interpretation_as_non_significant_prohibited": True,
+        }
+        if dict(contract) != expected_contract:
+            raise ValueError("DR-RESULTS-001 non-estimable contract mismatch")
+        if (
+            set(non_estimable["contrast"]) != {NON_ESTIMABLE_CONTRAST}
+            or set(non_estimable["endpoint"]) != set(RQ2_PRIMARY)
+            or set(non_estimable["support_status"]) != {NON_ESTIMABLE_STATUS}
+            or set(non_estimable["n_common_sample_keys"].astype(int)) != {14}
+            or set(non_estimable["n_leaf_pairs"].astype(int)) != {12}
+            or set(non_estimable["holm_family_size"].astype(int)) != {12}
+            or set(non_estimable["holm_estimable_count"].astype(int)) != {11}
+            or set(non_estimable["holm_reserved_non_estimable_slots"].astype(int)) != {1}
+            or set(non_estimable["holm_reserved_slot_value_for_adjustment_only"].astype(float)) != {1.0}
+        ):
+            raise ValueError("Frozen non-estimable rows differ from their contract")
+    else:
+        expected_contract = {
+            "planned_paired_rows": 576,
+            "estimable_paired_rows": 576,
+            "non_estimable_paired_rows": 0,
+            "minimum_common_leaf_count": 20,
+            "all_planned_contrasts_estimable": True,
+            "non_estimable_rows_allowed": False,
+        }
+        if decision.get("estimability_contract") != expected_contract:
+            raise ValueError("DR-RESULTS-002 estimability contract mismatch")
     empty_fields = (
         "left_mean",
         "right_mean",

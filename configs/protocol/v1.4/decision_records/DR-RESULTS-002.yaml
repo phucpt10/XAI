@@ -1,0 +1,91 @@
+decision_id: DR-RESULTS-002
+title: Freeze corrected protocol v1.4 official statistical-analysis results for reporting
+status: approved
+decision_type: official_test_results_freeze
+approved_at_utc: 2026-07-25
+approved_by: project_owner
+
+source_analysis:
+  run_type: authorized_official_test_statistical_analysis
+  report_sha256: 29d54b2dba3d5b241430beca66180603156758aa1db1c1d3b3b42eb53e110876
+  analysis_decision_id: DR-ANALYSIS-002
+  analysis_decision_record_sha256: 567c16db74648598106bdb4769b9b8ca0efb1406b45afcb73bc81fdd7a631bdf
+  analysis_support_decision_id: null
+  analysis_support_decision_record_sha256: null
+  analysis_support_audit_report_sha256: 091637899e966b99204045a96df2dadbf7279a7dac31968ddf1bf277374dffbd
+  git_commit: 791979d3022515c337f5aad87a0abe6a71a45dca
+  artifact_sha256:
+    paired_comparisons.csv: b224a50dddedc5a7c558cce2ae29865f0465d687e6a4fac88b45f0aa50b55d33
+    prediction_class_summary.csv: ba3117ed0f1462d69ba2fcd3d9e64db7b370f1489dde806b9efefefe022abdbc
+    prediction_summary.csv: a33a750ea37381ecd479d11c8faf6e42fd5b6f32e5d0469a1a9cfdeccd6c8ac8
+    rq3_association_summary.csv: 262c95f13c0f1d24dee91d48dee4abdeb5a6c4dc0ed59116c31b5c031fa068a4
+    xai_exclusion_audit.csv: 29984d6403aba263af1d31953838271d428a6271a23afc74f99640f002e22fed
+    xai_summary.csv: e59474272f0d4504b44ce0437f745d8f327324fc01f6c668fad8965e10fc924e
+
+frozen_row_counts:
+  source_prediction_rows: 40632
+  source_joint_rows: 121896
+  prediction_summary_rows: 96
+  prediction_class_summary_rows: 480
+  xai_summary_rows: 432
+  xai_exclusion_audit_rows: 151
+  paired_comparison_rows: 576
+  paired_estimable_rows: 576
+  paired_non_estimable_rows: 0
+  rq3_association_rows: 72
+
+estimability_contract:
+  planned_paired_rows: 576
+  estimable_paired_rows: 576
+  non_estimable_paired_rows: 0
+  minimum_common_leaf_count: 20
+  all_planned_contrasts_estimable: true
+  non_estimable_rows_allowed: false
+
+authorized_reporting_outputs:
+  tables:
+    - table_rq1_primary_summary.csv
+    - table_rq1_class_summary.csv
+    - table_rq2_primary_summary.csv
+    - table_paired_comparisons.csv
+    - table_inferential_overview.csv
+    - table_non_estimable_comparisons.csv
+    - table_xai_exclusion_audit.csv
+    - table_rq3_exploratory_associations.csv
+  figures:
+    - figure_rq1_is_consistent.png
+    - figure_rq1_transformed_is_correct.png
+    - figure_rq1_confidence_drop.png
+    - figure_rq2_pearson.png
+    - figure_rq2_ssim.png
+    - figure_rq2_topk_iou_20.png
+  summaries:
+    - frozen_results_summary.json
+    - frozen_results_summary.md
+    - results_reporting_report.json
+
+reporting_constraints:
+  source_artifacts_are_read_only: true
+  official_test_pixels_accessed: false
+  predictions_or_cams_recomputed: false
+  endpoints_or_holm_families_changed: false
+  non_estimable_rows_retained: true
+  non_estimable_rows_interpreted_as_non_significant: false
+  model_or_method_selection_from_results: false
+  tuning_from_results: false
+  rq3_remains_exploratory: true
+  severity_interpreted_within_transformation_only: true
+  rotation_claim_remains_zero_fill_operator_specific: true
+
+decision: >-
+  Freeze exactly the corrected protocol v1.4 official-analysis report and its
+  six verified CSV artifacts for read-only reporting. All 576 predeclared
+  paired comparisons are estimable; this does not authorize changes to the
+  scientific plan. Reporting may derive only the listed deterministic tables,
+  figures and summaries, and must not access image pixels, recompute
+  predictions or CAMs, alter endpoints or Holm families, select models or XAI
+  methods, or tune any system component.
+
+project_owner_approval: >-
+  Approved by the project owner on 2026-07-25 after verification of official
+  analysis report SHA-256 29d54b2dba3d5b241430beca66180603156758aa1db1c1d3b3b42eb53e110876.

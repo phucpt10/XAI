@@ -16,7 +16,6 @@ from plantxai_stability import __version__
 from plantxai_stability.artifacts import atomic_json
 from plantxai_stability.provenance import sha256_file
 from plantxai_stability.result_reporting import (
-    FROZEN_ANALYSIS_REPORT_SHA256,
     build_frozen_results_summary,
     build_reporting_tables,
     load_and_validate_frozen_results,
@@ -44,12 +43,16 @@ def main() -> int:
         decision=decision,
     )
     tables = build_reporting_tables(frames)
-    summary = build_frozen_results_summary(report=source_report, tables=tables)
+    summary = build_frozen_results_summary(
+        report=source_report,
+        tables=tables,
+        source_analysis_report_sha256=decision["source_analysis"]["report_sha256"],
+    )
 
     expected_outputs = decision["authorized_reporting_outputs"]
     expected_tables = sorted(expected_outputs["tables"])
     if sorted(tables) != expected_tables:
-        raise SystemExit("Reporting table plan differs from DR-RESULTS-001")
+        raise SystemExit("Reporting table plan differs from the Results Decision Record")
     if sorted(expected_outputs["summaries"]) != sorted(
         [
             "frozen_results_summary.json",
@@ -57,12 +60,12 @@ def main() -> int:
             "results_reporting_report.json",
         ]
     ):
-        raise SystemExit("Reporting summary plan differs from DR-RESULTS-001")
+        raise SystemExit("Reporting summary plan differs from the Results Decision Record")
 
     temporary.mkdir(parents=True, exist_ok=False)
     try:
         for name, frame in tables.items():
-            _write_csv(temporary / name, frame.to_dict(orient="records"))
+            _write_csv(temporary / name, frame)
         figure_paths = render_reporting_figures(
             tables=tables,
             output_dir=temporary,
@@ -104,11 +107,13 @@ def main() -> int:
             "frozen_analysis_acceptance_criteria_pass": True,
             "frozen_row_counts_match": True,
             "paired_rows_reconcile_576": (len(tables["table_paired_comparisons.csv"]) == 576),
-            "estimable_rows_reconcile_573": (
-                int(tables["table_paired_comparisons.csv"]["estimable"].sum()) == 573
+            "estimable_rows_reconcile": (
+                int(tables["table_paired_comparisons.csv"]["estimable"].sum())
+                == source_report["row_counts"]["paired_estimable_rows"]
             ),
-            "non_estimable_rows_reconcile_3": (
-                len(tables["table_non_estimable_comparisons.csv"]) == 3
+            "non_estimable_rows_reconcile": (
+                len(tables["table_non_estimable_comparisons.csv"])
+                == source_report["row_counts"]["paired_non_estimable_rows"]
             ),
             "authorized_table_coverage_exact": True,
             "authorized_figure_coverage_exact": True,
@@ -126,7 +131,7 @@ def main() -> int:
             "run_type": "frozen_official_results_reporting",
             "results_decision_id": decision["decision_id"],
             "results_decision_record_sha256": sha256_file(args.results_decision_record),
-            "source_analysis_report_sha256": FROZEN_ANALYSIS_REPORT_SHA256,
+            "source_analysis_report_sha256": decision["source_analysis"]["report_sha256"],
             "source_analysis_run_type": source_report["run_type"],
             "source_analysis_git_commit": source_report["runtime"]["git_commit"],
             "official_test_pixels_accessed": False,
@@ -160,17 +165,9 @@ def main() -> int:
     return 0
 
 
-def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    if not rows:
-        raise ValueError(f"Cannot write empty reporting table: {path}")
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(
-            handle,
-            fieldnames=list(rows[0]),
-            lineterminator="\n",
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+def _write_csv(path: Path, frame: Any) -> None:
+    """Write an authorized table, preserving headers even when it has no rows."""
+    frame.to_csv(path, index=False, lineterminator="\n")
 
 
 def _git_revision() -> str:
