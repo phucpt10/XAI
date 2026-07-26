@@ -1,0 +1,101 @@
+decision_id: DR-RESULTS-001
+title: Freeze official statistical-analysis results for reporting
+status: approved
+decision_type: official_test_results_freeze
+approved_at_utc: 2026-07-24
+approved_by: project_owner
+
+source_analysis:
+  run_type: authorized_official_test_statistical_analysis
+  report_sha256: 68a9b47fddb2f203aa35a78645849f4e15c11379dbba6dfc79c9a188557294de
+  analysis_decision_id: DR-ANALYSIS-001
+  analysis_decision_record_sha256: 44353953fbb98bda42a32514ea9421c6f2d251af5fa6b2ec63b5d4216a80c3bb
+  analysis_support_decision_id: DR-ANALYSIS-SUPPORT-001
+  analysis_support_decision_record_sha256: 6e1297f5dd43474cead4f9bf57fcd24b188a4793ff5008dd3891316eea069204
+  analysis_support_audit_report_sha256: f370b3c7ace79cd5523242831593522671844f6459d2fa344f21f829613c13ac
+  git_commit: 7eaeb4f884531de9e52ccc7856dfda95b81d176e
+  artifact_sha256:
+    paired_comparisons.csv: 1ef53d4eecb109872b379ae612e4d1cfd9540d7d20a835aac8ceb89b34ca7d9a
+    prediction_class_summary.csv: 564f6505827eab074ac2903058d2f5abb33e696ca4742a4e774b252fb9d84f0a
+    prediction_summary.csv: 65201d8003c1ad9d269e6c20522f81bb5e0c01f2f39fa2d7853f9058709121d6
+    rq3_association_summary.csv: f7e354bb6dac7e0ebb7f5d217e47a695ad1501282042ff1dc0fa8dab6c734a84
+    xai_exclusion_audit.csv: ecb9da6925f033e08e6cf9fec95410084798f93c0ae510f16b908e468c8c2ba9
+    xai_summary.csv: 1a32f6f3b9f1d079a297ff1219c154222353a8bcae719b54af74b9aaf4bced74
+
+frozen_row_counts:
+  source_prediction_rows: 40632
+  source_joint_rows: 121896
+  prediction_summary_rows: 96
+  prediction_class_summary_rows: 480
+  xai_summary_rows: 432
+  xai_exclusion_audit_rows: 167
+  paired_comparison_rows: 576
+  paired_estimable_rows: 573
+  paired_non_estimable_rows: 3
+  rq3_association_rows: 72
+
+non_estimable_contract:
+  contrast: resnet50_minus_efficientnet_b0::score_cam::gaussian_blur_severe
+  endpoints:
+    - pearson
+    - ssim
+    - topk_iou_20
+  support_status: NOT_ESTIMABLE_INSUFFICIENT_COMMON_LEAVES
+  common_sample_count: 14
+  common_leaf_count: 12
+  minimum_common_leaf_count: 20
+  inferential_fields_empty: true
+  interpretation_as_non_significant_prohibited: true
+
+authorized_reporting_outputs:
+  tables:
+    - table_rq1_primary_summary.csv
+    - table_rq1_class_summary.csv
+    - table_rq2_primary_summary.csv
+    - table_paired_comparisons.csv
+    - table_inferential_overview.csv
+    - table_non_estimable_comparisons.csv
+    - table_xai_exclusion_audit.csv
+    - table_rq3_exploratory_associations.csv
+  figures:
+    - figure_rq1_is_consistent.png
+    - figure_rq1_transformed_is_correct.png
+    - figure_rq1_confidence_drop.png
+    - figure_rq2_pearson.png
+    - figure_rq2_ssim.png
+    - figure_rq2_topk_iou_20.png
+  summaries:
+    - frozen_results_summary.json
+    - frozen_results_summary.md
+    - results_reporting_report.json
+
+reporting_constraints:
+  source_artifacts_are_read_only: true
+  official_test_pixels_accessed: false
+  predictions_or_cams_recomputed: false
+  endpoints_or_holm_families_changed: false
+  non_estimable_rows_retained: true
+  non_estimable_rows_interpreted_as_non_significant: false
+  model_or_method_selection_from_results: false
+  tuning_from_results: false
+  rq3_remains_exploratory: true
+  severity_interpreted_within_transformation_only: true
+  rotation_claim_remains_zero_fill_operator_specific: true
+
+decision: >-
+  Freeze the exact official statistical-analysis report and its six child CSV
+  artifacts for read-only reporting. Authorize deterministic tables, figures
+  and structured summaries derived only from those artifacts. Retain all three
+  Score-CAM by Gaussian-blur-severe endpoint rows as non-estimable and never
+  describe them as non-significant findings. Reporting must not decode images,
+  recompute predictions or CAMs, alter the registered analysis, select a model
+  or method, or tune any scientific component.
+
+project_owner_approval: >-
+  Tôi phê duyệt đóng băng kết quả phân tích chính thức dựa trên report SHA
+  68a9b47fddb2f203aa35a78645849f4e15c11379dbba6dfc79c9a188557294de.
+  Cho phép tạo DR-RESULTS-001 và triển khai trình tạo bảng, hình và bản tóm tắt
+  kết quả fail-closed từ đúng các artifact đã xác minh. Ba dòng Score-CAM ×
+  Gaussian blur severe phải tiếp tục được báo cáo là non-estimable, không được
+  diễn giải như kết quả không có ý nghĩa thống kê. Không chạy lại official test
+  và không sử dụng kết quả để lựa chọn hoặc tinh chỉnh hệ thống.

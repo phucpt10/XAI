@@ -1,0 +1,76 @@
+decision_id: DR-LEAF-001
+title: PlantVillage leaf identity reconstruction policy
+status: rejected
+dataset_id: mohanty/PlantVillage
+dataset_configuration: color
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+selected_classes:
+  - Tomato___healthy
+  - Tomato___Bacterial_spot
+  - Tomato___Early_blight
+  - Tomato___Late_blight
+  - Tomato___Septoria_leaf_spot
+policy:
+  mapped_identity: >-
+    Use leaf-map.json when it provides one unique suggestion or exactly one
+    suggestion matching the canonical class.
+  reconstructed_identity: >-
+    For an unresolved source row, apply the pinned source loader filename
+    normalization and record fallback_<source-identity> with provenance label
+    filename_reconstructed.
+  silent_fallback_allowed: false
+acceptance_criteria:
+  coverage: 1.0
+  ambiguous_sample_count: 0
+  collision_candidate_count: 0
+  leaf_class_conflict_count: 0
+  leaf_split_overlap_count: 0
+evidence:
+  dataset_receipt_sha256: pending
+  resolution_report_sha256: pending
+  resolution_summary_sha256: pending
+  audit_passed: false
+development_audit_observation:
+  scope: pinned metadata audit; not an approved official artifact bundle
+  date_utc: 2026-07-22
+  sample_count: 8398
+  coverage: 1.0
+  mapped_leaf_id_count: 6045
+  filename_reconstructed_count: 2353
+  leaf_map_status_counts:
+    unique_leaf_map_match: 5724
+    class_disambiguated_leaf_map_match: 321
+    missing_leaf_map_match: 2353
+  leaf_map_comparison_status_counts:
+    leaf_map_reference: 6045
+    no_leaf_map_reference: 2353
+  ambiguous_sample_count: 0
+  collision_candidate_count: 0
+  leaf_class_conflict_count: 0
+  leaf_split_overlap_count: 5
+  invalid_sample_count: 10
+  passed: false
+  dataset_receipt_sha256: 48966ac39ece8bf88265225841d7700ba4c3ff77c3e9a0bbf8d58a1ab2081cca
+  resolution_report_sha256: 3fe73474852fae9158bc2e133163e24119a706eb97e3e142338ec1fee9b8ce4c
+  resolution_summary_sha256: 2a9eda10d88707e8b30673d55307c9fd79dc2ea7ead6a34fe50b145e0dc8bfe0
+  leaf_split_overlap_ids:
+    - fallback_GHLB2 Leaf 8999
+    - fallback_GHLB_PS Leaf 23.7 Day 13
+    - fallback_GHLB_PS Leaf 24 Day 16
+    - fallback_GH_HL Leaf 220
+    - fallback_GH_HL Leaf 466.1
+decision: >-
+  Reject this reconstruction evidence for official manifest creation because
+  five reconstructed leaf identities cross the upstream train/test boundary.
+  Do not move, remove, relabel or disambiguate affected samples without a new
+  reviewed Decision Record and protocol change.
+rationale: >-
+  Filename reconstruction is considered only because the pinned upstream
+  loader explicitly defines the same fallback rule. It is not approved until
+  sample-level comparison and leakage/conflict checks pass.
+approved_by: not_applicable_rejected_by_frozen_acceptance_gate
+approved_at_utc: null
+notes: >-
+  Official manifest creation remains blocked. A replacement record may be
+  approved only after the leakage is resolved with auditable biological or
+  source evidence and every frozen acceptance criterion passes.

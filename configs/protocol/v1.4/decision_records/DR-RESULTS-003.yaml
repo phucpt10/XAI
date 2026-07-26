@@ -1,0 +1,59 @@
+decision_id: DR-RESULTS-003
+title: Authorize read-only classwise supplementary reporting for corrected protocol v1.4
+status: approved
+decision_type: official_test_classwise_supplementary_reporting
+approved_at_utc: 2026-07-25
+approved_by: project_owner
+
+source_analysis:
+  report_sha256: 29d54b2dba3d5b241430beca66180603156758aa1db1c1d3b3b42eb53e110876
+  run_type: authorized_official_test_statistical_analysis
+  analysis_decision_id: DR-ANALYSIS-002
+  analysis_decision_record_sha256: 567c16db74648598106bdb4769b9b8ca0efb1406b45afcb73bc81fdd7a631bdf
+  prediction_class_summary_sha256: ba3117ed0f1462d69ba2fcd3d9e64db7b370f1489dde806b9efefefe022abdbc
+
+source_merges:
+  resnet50:
+    report_sha256: 2916358206064a4f8b605ce1af9f9dd636f6eae263ff28ca8819c61006338410
+    run_id: resnet50-joint-merged-v1.4
+  efficientnet_b0:
+    report_sha256: 49e9130def3015497c82f016adaa86b56694f3cecb70ec6dedc4f3c277e75c93
+    run_id: efficientnet_b0-joint-merged-v1.4
+
+authorized_outputs:
+  artifacts:
+    - supplement_classwise_rq1.csv
+    - supplement_classwise_xai_valid_coverage.csv
+    - supplement_classwise_xai_descriptive.csv
+    - supplement_leave_one_class_out_rq1.csv
+    - supplement_leave_one_class_out_xai.csv
+    - supplement_classwise_methodology.md
+    - classwise_supplementary_report.json
+
+constraints:
+  source_artifacts_read_only: true
+  official_test_pixels_accessed: false
+  predictions_or_cams_recomputed: false
+  no_new_hypothesis_tests: true
+  no_new_confidence_intervals: true
+  no_endpoint_or_holm_family_changes: true
+  no_model_or_method_selection: true
+  no_tuning: true
+  classwise_results_descriptive_only: true
+  leave_one_class_out_is_sensitivity_diagnostic_only: true
+  xai_metrics_conditional_on_valid_prediction_consistent_cam: true
+  external_generalization_claims_prohibited: true
+
+decision: >-
+  Authorize one deterministic, read-only supplementary reporting run from the
+  exact corrected v1.4 analysis and merge artifacts named above. The run may
+  tabulate classwise descriptive summaries, valid-CAM coverage, and
+  leave-one-class-out sensitivity diagnostics. It must not read image pixels,
+  recompute predictions or CAMs, add inferential tests or confidence intervals,
+  alter registered endpoints or multiplicity families, select models or XAI
+  methods, or tune any component. The outputs must be labeled descriptive and
+  conditional on valid, prediction-consistent CAM records where applicable.
+
+project_owner_approval: >-
+  Approved by the project owner on 2026-07-25 to make the classwise sensitivity
+  evidence transparent as a read-only supplementary analysis.

@@ -1,0 +1,92 @@
+decision_id: DR-CHECKPOINT-001
+title: Validation-only selection of the two official model checkpoints
+status: approved
+decision_type: g1_validation_checkpoint_selection
+approved_at_utc: 2026-07-23
+approved_by: project_owner
+
+selection_policy:
+  declared_models:
+    - resnet50
+    - efficientnet_b0
+  selection_metric: validation_macro_f1
+  selected_checkpoint_role: validation_selected_best
+  retain_all_predeclared_backbones: true
+  model_ranking_is_descriptive_only: true
+  official_test_used_for_selection: false
+
+training_lineage:
+  protocol_hash: 7eb0814be8ffc1a19f54e2bec2d2ca0c84d7f4d869d99e28b69e6c9e0e84523b
+  manifest_sha256: 323b48e3564708d566e0e9f5c346a07ef728828b2879fc1975e21ca32e024894
+  freeze_record_sha256: aed2e96afd2749250d4151780bb4002d198eb96d7433d2bef5b03d4a6ac9212d
+  checkpoint_source_git_commit: 3facdc158bc660b8138dc7d80447c99c85617841
+  seed: 42
+  validation_sample_count: 1363
+  validation_sample_ids_sha256: 7b1fa9caadbd6b62295439a62cfe3c3ae59e6682db54248b4849b427129d4907
+
+validation_audit:
+  audit_git_commit: eb674ac01250998e718ec8ee817c5468926b3d87
+  source_split: validation
+  test_split_accessed: false
+  common_acceptance_criteria:
+    all_classes_have_support: true
+    checkpoint_lineage_matches: true
+    confusion_matrix_reconciles: true
+    freeze_protocol_hash_matches: true
+    metrics_finite: true
+    sample_coverage_exact: true
+    sample_identity_order_reproducible: true
+    selected_macro_f1_reproduced: true
+    test_split_not_accessed: true
+    validation_only: true
+
+approved_checkpoints:
+  resnet50:
+    checkpoint_sha256: b508abd2851c5f576131db0e47447624cd78f1e3204c2931f7928c266f0c7bfc
+    checkpoint_evidence_sha256: 5f50b4e65f652b779f7b76cd395d4f00bb0ed1b39fb690d196e44964861accce
+    best_epoch: 29
+    validation_macro_f1: 0.9929163657569321
+    validation_accuracy: 0.9941305942773294
+    validation_error_count: 8
+    validation_artifact_sha256:
+      validation_confusion_matrix.csv: 07e96e13c3fe1e3c79866fc1f1d80f00bc3d3ea78fe8451cbccebc923a37c1f8
+      validation_per_class_metrics.csv: ae8d0af6362cb081c78d39d3799e25244616c9b839037a45962a43b13c1da891
+      validation_predictions.csv: c01c775a2d011aabc756446824b42e19a958ffb3c61f397c5f93dd0983099e04
+      validation_predictions.parquet: bb206f778f096c897eae090d92d25ea637d508678542c75b3f6c65d417b81c38
+  efficientnet_b0:
+    checkpoint_sha256: 05b592f1ff7f4f2b4a757ae2564a088e3742555e20110ee33d19e563ff2fe60b
+    checkpoint_evidence_sha256: 70cd2aa0207b03492afc06d36213e3cb25c9975a6daa7beb103d51e631abe6a3
+    best_epoch: 19
+    validation_macro_f1: 0.9971833207303504
+    validation_accuracy: 0.9977989728539985
+    validation_error_count: 3
+    validation_artifact_sha256:
+      validation_confusion_matrix.csv: 00343ac105eddeb8ec5a89f9ac50840fd22f3fee15e862a545257df19446bc15
+      validation_per_class_metrics.csv: e020f3c31ec4c96e5e0fab713c937b1425c18bbc5c7364825ae65249d5fd23f0
+      validation_predictions.csv: 24a02b41e2ec672b03a581b9737d67892d6a7ceb38567aa5aba2fcbe6f780b91
+      validation_predictions.parquet: 4ea84f0396372c84467f9ec617e211753ae6963d477cedd452083989f9ff457e
+
+scientific_interpretation:
+  efficientnet_validation_advantage_is_not_an_inferential_claim: true
+  weakest_validation_class_for_both_models: Tomato___Early_blight
+  high_confidence_errors_require_later_calibration_review: true
+  generalization_claim_allowed_at_g1: false
+
+decision: >-
+  Approve both validation-selected checkpoints for the G1 model-checkpoint
+  registry. The models remain separate predeclared experimental backbones;
+  neither is removed or declared generally superior from validation results.
+  This decision does not authorize official-test access.
+
+governance_effect:
+  governance_protocol_hash: 88440f4e740a707e128cb80d0680dca4f38c104388f51d9493b5b1adb76affe9
+  G1_CHECKPOINT_SELECTION: pass
+  G2_TEST_EVALUATION_READY: blocked
+  official_test_evaluation_allowed: false
+  remaining_g2_blocker: final_freeze_artifacts_not_rebound
+
+project_owner_approval: >-
+  Tôi phê duyệt G1 cho cả ResNet50 checkpoint b508abd...c7bfc và
+  EfficientNet-B0 checkpoint 05b592f...fe60b, chỉ dựa trên validation. Cho
+  phép tạo DR-CHECKPOINT-001 và cập nhật G1 thành pass; chưa mở khóa official
+  test/G2.

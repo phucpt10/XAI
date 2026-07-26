@@ -1,0 +1,221 @@
+"""Fail-closed loading and validation of the versioned protocol."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+@dataclass(frozen=True)
+class ResolvedConfig:
+    values: dict[str, Any]
+    sha256: str
+
+    @property
+    def seed(self) -> int:
+        return int(self.values["seed"])
+
+
+def canonical_json(values: dict[str, Any]) -> str:
+    return json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def load_protocol(path: str | Path) -> ResolvedConfig:
+    protocol_path = Path(path)
+    with protocol_path.open("r", encoding="utf-8") as handle:
+        values = yaml.safe_load(handle)
+    if not isinstance(values, dict):
+        raise ValueError("Protocol must be a mapping")
+    _validate_protocol(values)
+    digest = hashlib.sha256(canonical_json(values).encode("utf-8")).hexdigest()
+    return ResolvedConfig(values=values, sha256=digest)
+
+
+def _validate_protocol(values: dict[str, Any]) -> None:
+    required = {
+        "schema_version",
+        "protocol_version",
+        "status",
+        "frozen",
+        "seed",
+        "governance",
+        "dataset",
+        "models",
+        "training",
+        "transformations",
+        "xai",
+        "statistics",
+    }
+    missing = required.difference(values)
+    if missing:
+        raise ValueError(f"Protocol missing required keys: {sorted(missing)}")
+    if values["status"] not in {"draft", "frozen", "retired"}:
+        raise ValueError("status must be draft, frozen or retired")
+    if not isinstance(values["seed"], int) or values["seed"] < 0:
+        raise ValueError("seed must be a non-negative integer")
+    dataset = values["dataset"]
+    if dataset.get("group_key") != "leaf_id":
+        raise ValueError("dataset.group_key must be leaf_id")
+    if not dataset.get("classes"):
+        raise ValueError("dataset.classes must not be empty")
+    quarantine = dataset.get("quarantine_policy", {})
+    if quarantine.get("enabled") is not True:
+        raise ValueError("dataset.quarantine_policy.enabled must be true")
+    if quarantine.get("official_test_action") != "preserve_exactly":
+        raise ValueError("Quarantine policy must preserve the official test exactly")
+    if quarantine.get("train_test_leaf_overlap_action") != "quarantine_source_train":
+        raise ValueError("Only source-train quarantine is allowed for train/test leaf overlap")
+    governance = values["governance"]
+    evidence_records = governance.get("evidence_records", {})
+    if not evidence_records.get("runtime_readiness"):
+        raise ValueError("governance.evidence_records.runtime_readiness is required")
+    if not evidence_records.get("xai_target_layers"):
+        raise ValueError("governance.evidence_records.xai_target_layers is required")
+    if not evidence_records.get("transformation_severity"):
+        raise ValueError("governance.evidence_records.transformation_severity is required")
+    if governance.get("G1_CHECKPOINT_SELECTION") == "pass":
+        if governance.get("checkpoint_blockers"):
+            raise ValueError("A passing G1 gate cannot retain checkpoint blockers")
+        if not evidence_records.get("checkpoint_selection"):
+            raise ValueError(
+                "governance.evidence_records.checkpoint_selection is required for G1 PASS"
+            )
+    if governance.get("G2_TEST_EVALUATION_READY") == "pass":
+        if governance.get("G1_CHECKPOINT_SELECTION") != "pass":
+            raise ValueError("A passing G2 gate requires G1 PASS")
+        if governance.get("test_evaluation_blockers"):
+            raise ValueError("A passing G2 gate cannot retain test-evaluation blockers")
+        if not evidence_records.get("test_evaluation"):
+            raise ValueError(
+                "governance.evidence_records.test_evaluation is required for G2 PASS"
+            )
+    if values["frozen"] != (values["status"] == "frozen"):
+        raise ValueError("status=frozen and frozen=true must be declared together")
+    if values["frozen"] and not values.get("frozen_at"):
+        raise ValueError("A frozen protocol requires frozen_at")
+    if values["frozen"] and governance.get("G0B_PROTOCOL_FREEZE_READY") != "pass":
+        raise ValueError("A frozen protocol requires a passing G0B gate")
+    if governance.get("G0B_PROTOCOL_FREEZE_READY") == "pass" and governance.get(
+        "blockers"
+    ):
+        raise ValueError("A passing G0B gate cannot retain G0B blockers")
+    if governance.get("official_training_allowed") and (
+        not values["frozen"] or governance.get("G0B_PROTOCOL_FREEZE_READY") != "pass"
+    ):
+        raise ValueError("Official training requires a frozen protocol and G0B PASS")
+    if governance.get("official_test_evaluation_allowed") and (
+        not governance.get("official_training_allowed")
+        or governance.get("G1_CHECKPOINT_SELECTION") != "pass"
+        or governance.get("G2_TEST_EVALUATION_READY") != "pass"
+    ):
+        raise ValueError("Official test evaluation requires training, G1 and G2 approval")
+    if governance.get("official_experiment_allowed") != governance.get(
+        "official_test_evaluation_allowed"
+    ):
+        raise ValueError(
+            "official_experiment_allowed and official_test_evaluation_allowed "
+            "must change together"
+        )
+    xai = values["xai"]
+    if not xai.get("target_layer_decision_record"):
+        raise ValueError("xai.target_layer_decision_record is required")
+    target_layers = xai.get("target_layers", {})
+    missing_target_layers = set(values["models"]).difference(target_layers)
+    if missing_target_layers:
+        raise ValueError(f"XAI target layers missing for models: {sorted(missing_target_layers)}")
+    for model_id in values["models"]:
+        configured = target_layers[model_id]
+        if isinstance(configured, str):
+            _validate_target_layer_specification(configured)
+            continue
+        if not isinstance(configured, dict):
+            raise ValueError("Every model requires a runtime-approved XAI target layer")
+        missing_methods = set(xai.get("methods", [])).difference(configured)
+        if missing_methods:
+            raise ValueError(
+                f"XAI target layers missing methods for {model_id}: "
+                f"{sorted(missing_methods)}"
+            )
+        for method in xai["methods"]:
+            _validate_target_layer_specification(configured[method])
+    transformations = values["transformations"]
+    if (
+        transformations.get("algorithm_version")
+        not in {
+            "shared_randomization_zero_fill_valid_mask_v6",
+            "shared_randomization_zero_fill_valid_mask_v7",
+        }
+    ):
+        raise ValueError("Unsupported transformation algorithm version")
+    expected_xai_policy = {
+        "alignment_policy": "forward_align_original_cam",
+        "valid_region_policy": "geometric_support_mask",
+        "target_class_policy": "original_predicted_class",
+        "prediction_consistency_required": True,
+        "rotation_prediction_claim_scope": "zero_filled_operator_specific",
+    }
+    if any(xai.get(key) != value for key, value in expected_xai_policy.items()):
+        raise ValueError("Unsupported XAI alignment or claim policy")
+    if xai.get("topk_iou_primary") != 0.2 or xai.get("topk_iou_sensitivity") != [0.1, 0.2, 0.3]:
+        raise ValueError("Unsupported top-k IoU policy")
+    if xai.get("ssim_window_size") != 7 or xai.get("validity_threshold") != 0.999999:
+        raise ValueError("Unsupported masked SSIM or validity-mask policy")
+    rotation_parameters = transformations.get("parameters", {}).get("rotation", {})
+    if not rotation_parameters or any(
+        parameters.get("fill_policy") != "constant_zero"
+        or parameters.get("validity_threshold") != xai["validity_threshold"]
+        for parameters in rotation_parameters.values()
+    ):
+        raise ValueError("Rotation parameters do not match the XAI valid-region policy")
+    training = values["training"]
+    if training.get("optimizer") != "adamw":
+        raise ValueError("Only the declared AdamW optimizer is allowed")
+    if training.get("pretrained_weights") != {
+        "resnet50": "IMAGENET1K_V2",
+        "efficientnet_b0": "IMAGENET1K_V1",
+    }:
+        raise ValueError("Training pretrained weight identities are not approved")
+    if training.get("fine_tuning") != "full_model":
+        raise ValueError("Only full-model fine-tuning is approved")
+    if training.get("loss") != "cross_entropy" or training.get("class_weighting") != "none":
+        raise ValueError("Only unweighted cross-entropy is approved")
+    if training.get("scheduler") != "cosine":
+        raise ValueError("Only the declared cosine scheduler is allowed")
+    if training.get("selection_metric") != "validation_macro_f1":
+        raise ValueError("Checkpoint selection must use validation macro-F1")
+    if training.get("deterministic_algorithms") is not True:
+        raise ValueError("training.deterministic_algorithms must be true")
+    stats = values["statistics"]
+    if stats.get("bootstrap_unit") != "leaf_id":
+        raise ValueError("statistics.bootstrap_unit must be leaf_id")
+    if stats.get("correction") != "holm":
+        raise ValueError("Only the declared Holm correction is allowed")
+
+
+def _validate_target_layer_specification(value: Any) -> None:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or value.startswith("PENDING_")
+    ):
+        raise ValueError("Every model requires a runtime-approved XAI target layer")
+
+
+def resolve_xai_target_layer(
+    xai_policy: dict[str, Any], model_id: str, xai_method: str
+) -> str:
+    """Return the frozen target-layer specification for one model/method pair."""
+    configured = xai_policy["target_layers"][model_id]
+    if isinstance(configured, str):
+        return configured
+    try:
+        return str(configured[xai_method])
+    except KeyError as exc:
+        raise ValueError(
+            f"No target layer configured for {model_id}/{xai_method}"
+        ) from exc

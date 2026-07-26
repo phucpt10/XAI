@@ -1,0 +1,77 @@
+decision_id: DR-SEVERITY-006
+title: Approval of severity pilot and visual review v6
+status: approved
+decision_type: transformation_severity_pilot_and_visual_adjudication
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+pilot:
+  run_type: validation_only_image_space_severity_pilot
+  protocol_hash: e0856c07cd2ee92edf037de39315f137b27932f28c80f54cfb55998cf4771aa6
+  transformation_algorithm_version: shared_randomization_zero_fill_valid_mask_v6
+  selected_sample_count: 239
+  selected_leaf_count: 239
+  row_count: 2868
+  source_split: validation
+  test_split_accessed: false
+  technical_gate_passed: true
+  opencv_runtime_version: 4.13.0
+  opencv_distribution_version: 4.13.0.92
+evidence:
+  severity_pilot_summary_sha256: d549632df71bb9bd0612d2f2f4239d0ba820d3209c7c19b87c52ab916415a0df
+  severity_pilot_records_sha256: 809c38d91adc0358222098f7cc9c33c6facae62b3fca842cb5c37bbb39240225
+  severity_pilot_selection_sha256: 961b79ef584261a50b597b66827ccf3fdde061dadb91b97ea074ae66112cc585
+  visual_artifact_sha256:
+    brightness: 3b8bbd1c586e8843778a89dfde59fe05605264f707d16ce1ec0f9f7dd4d28535
+    gaussian_blur: bdde97939eef6cec2a45e7aefd01bad316822f825ae087fb22d96c5f8f357aed
+    gaussian_noise: e8f573cc9ab5440f40f3d1c55d9dcb7e288755985ff5afe677ce48989b11a05e
+    rotation: 4d9f855cd7eb14f00f92914c559c10cd556baeaf5283405d59f9a6688754e764
+  representative_sample_ids:
+    - pv_8ab90fc16f271622
+    - pv_9d8a0eca7ab16f44
+    - pv_8a1829daffa0be9d
+    - pv_a4bc555988287cfa
+    - pv_cdb871f54ca8a301
+acceptance_criteria:
+  all_12_scenarios_present: true
+  all_metrics_finite: true
+  deterministic_recheck_passed: true
+  median_rmse_strictly_increases_by_severity: true
+  minimum_class_leaf_coverage: true
+  one_sample_per_leaf: true
+  rotation_invalid_fraction_strictly_increases: true
+  rotation_zero_fill_valid_mask_passed: true
+  shared_randomization_seed_consistent: true
+  single_opencv_distribution_version: true
+  single_opencv_runtime_version: true
+  validation_only: true
+rotation_invalid_fraction:
+  mild: 0.076904296875
+  moderate: 0.14453125
+  severe: 0.1739501953125
+visual_review:
+  result: PASS_WITH_DECLARED_OPERATOR_LIMITATION
+  recognizable_leaf_and_disease_evidence: true
+  severity_visually_ordered_within_transformation: true
+  zero_fill_treated_as_invalid_geometric_support_for_xai_metrics: true
+  invalid_support_visibly_ordered_for_rotation: true
+  telea_smearing_absent: true
+  reflected_leaf_repetition_absent: true
+  uniform_polygon_completion_absent: true
+decision: >-
+  Approve severity pilot and visual review v6 for G0B. Severity labels are
+  ordinal only within each transformation family and must not be interpreted
+  as calibrated equivalents across transformation families.
+claim_boundary: >-
+  Rotation prediction robustness is specific to the declared zero-filled
+  operator. Explanation stability requires forward alignment of the original
+  CAM and comparison only on geometric valid support M_T. M_T is not a leaf or
+  lesion segmentation mask, and it does not prevent zero-fill from influencing
+  model predictions or internal activations.
+project_owner_approval: >-
+  Tôi phê duyệt kết quả severity pilot và visual review v6 với trạng thái
+  PASS_WITH_DECLARED_OPERATOR_LIMITATION. Severity chỉ có ý nghĩa thứ tự trong
+  từng transformation; prediction robustness của rotation chỉ áp dụng cho
+  zero-filled operator; XAI stability phải sử dụng forward alignment và valid
+  region M_T.
+approved_by: project_owner
+methodology_reviewed_by: research_methodology_quality_gate
+approved_at_utc: 2026-07-23

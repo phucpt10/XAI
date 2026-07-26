@@ -1,0 +1,38 @@
+decision_id: DR-SEVERITY-001
+title: Rejection of severity pilot v1 independent randomization
+status: rejected
+decision_type: transformation_severity_pilot_adjudication
+dataset_revision: 9e97599868962bd0079b8db4b7f1efa9185fa1e7
+pilot:
+  run_type: validation_only_image_space_severity_pilot
+  protocol_hash: 4fc62dfb6f4d1dc045f359d7e0eafc090116cbecdba45cdd0f0982456b5381f2
+  selected_sample_count: 239
+  selected_leaf_count: 239
+  row_count: 2868
+  test_split_accessed: false
+  technical_gate_passed: true
+evidence:
+  severity_pilot_records_sha256: 591070b1d13b1833aad7d1decc24555e4092c65437c636cbedaa01efe0c78aca
+  severity_pilot_selection_sha256: 961b79ef584261a50b597b66827ccf3fdde061dadb91b97ea074ae66112cc585
+visual_review_findings:
+  brightness_direction_consistent_across_severity: false
+  affected_examples:
+    - pv_9d8a0eca7ab16f44
+    - pv_8a1829daffa0be9d
+    - pv_cdb871f54ca8a301
+  root_cause: >-
+    The random seed included scenario_id, so mild, moderate and severe drew
+    independent brightening or darkening directions for the same sample.
+  additional_affected_transformations:
+    - rotation_direction
+    - gaussian_noise_realization
+decision: >-
+  Reject pilot v1 despite its numerical technical gate. Its severity levels do
+  not isolate perturbation magnitude because stochastic nuisance variables are
+  resampled independently across levels.
+required_corrective_action: >-
+  Pin a new transformation algorithm that shares direction or base noise by
+  sample_id and transformation across all severity levels, then rerun the pilot
+  and visual review in new immutable v2 directories.
+reviewed_by: project_owner
+reviewed_at_utc: 2026-07-22

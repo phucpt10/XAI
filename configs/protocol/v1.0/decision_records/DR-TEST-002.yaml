@@ -1,0 +1,12 @@
+decision_id: DR-TEST-002
+title: Conditional authorization for v1.0 official test evaluation
+status: pending_preflight
+decision_type: official_test_authorization
+created_at_utc: 2026-07-24
+approved_by: project_owner
+preconditions:
+  gaussian_blur_severity_pilot_passed: false
+  score_cam_validation_preflight_passed: false
+  protocol_v1_hash_recorded: false
+  g2_authorization_must_be_updated_before_test_pixel_access: true
+decision: Test-pixel access is not authorized until validation-only preflights pass and a successor approval records the frozen protocol hash.

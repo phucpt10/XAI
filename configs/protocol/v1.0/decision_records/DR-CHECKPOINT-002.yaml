@@ -1,0 +1,21 @@
+decision_id: DR-CHECKPOINT-002
+title: Reuse of fixed baseline checkpoints for evaluation-only correction
+status: approved
+decision_type: checkpoint_selection
+approved_at_utc: 2026-07-24
+approved_by: project_owner
+decision:
+  training_rerun_required: false
+  checkpoint_reselection_permitted: false
+  fixed_models: [resnet50, efficientnet_b0]
+  checkpoint_sha256_must_match_baseline_authorization: true
+approved_checkpoints:
+  resnet50:
+    filename: resnet50_best.pt
+    checkpoint_sha256: b508abd2851c5f576131db0e47447624cd78f1e3204c2931f7928c266f0c7bfc
+    checkpoint_evidence_sha256: 5f50b4e65f652b779f7b76cd395d4f00bb0ed1b39fb690d196e44964861accce
+  efficientnet_b0:
+    filename: efficientnet_b0_best.pt
+    checkpoint_sha256: 05b592f1ff7f4f2b4a757ae2564a088e3742555e20110ee33d19e563ff2fe60b
+    checkpoint_evidence_sha256: 70cd2aa0207b03492afc06d36213e3cb25c9975a6daa7beb103d51e631abe6a3
+project_owner_approval: Fixed checkpoints may be reused only for the v1.0 evaluation rerun.

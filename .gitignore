@@ -1,0 +1,49 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+*.log
+
+# Dataset and run artifacts never belong in normal Git history.
+data/raw/
+data/cache/
+outputs/
+checkpoints/
+.private-data/
+.private-review/
+.private-paper/
+*.pt
+*.pth
+*.ckpt
+
+# Local notebooks and Colab caches.
+.ipynb_checkpoints/
+.colab_cache/
+
+# Local document-generation and assistant workspaces.
+.docx_qa/
+.spec_work/
+plantxai_spec_qa/
+.agents/
+.codex/
+.augment/
+
+# Reviewer material, manuscripts, generated papers, and design sources are
+# private project inputs and must never enter the execution repository.
+reviews/
+reviewer/
+manuscript/
+manuscripts/
+paper/
+papers/
+*.docx
+*.tex
+*Architecture*.md
+*Specification*.md
+*style_evidence*.json
+
+# Local Git metadata workaround for managed workspaces where .git is read-only.
+.gitmeta/
